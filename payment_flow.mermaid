@@ -1,0 +1,43 @@
+sequenceDiagram
+    participant User
+    participant Gateway
+    participant Pledge
+    participant DB as PledgeDB (Outbox)
+    participant NATS
+    participant Payment
+    participant Bank
+
+    User->>Gateway: POST /pledges (Amount, Card)
+    Gateway->>Pledge: Create Pledge
+    Pledge->>DB: Insert Pledge (PENDING)
+    Pledge-->>User: Pledge Created
+
+    Note over User, Bank: Async Payment Processing
+
+    User->>Gateway: POST /payments/authorize
+    Gateway->>Payment: Authorize Request
+    Payment->>Bank: POST /authorize
+    Bank-->>Payment: Success (HoldID)
+    Payment->>Payment: Send Webhook (Authorized)
+    Payment->>NATS: Pub payment.update (AUTHORIZED)
+    
+    NATS->>Pledge: Sub payment.update
+    Pledge->>DB: TX: Update Status -> AUTHORIZED
+    Pledge->>DB: TX: Insert Outbox Event
+    
+    loop Outbox Worker
+        Pledge->>DB: Read Unprocessed Events
+        Pledge->>NATS: Pub pledge.updated
+        Pledge->>DB: Mark Processed
+    end
+
+    User->>Gateway: POST /payments/capture
+    Gateway->>Payment: Capture Request
+    Payment->>Bank: POST /capture (HoldID)
+    Bank-->>Payment: Success (TxID)
+    Payment->>Payment: Send Webhook (Captured)
+    Payment->>NATS: Pub payment.update (CAPTURED)
+
+    NATS->>Pledge: Sub payment.update
+    Pledge->>DB: TX: Update Status -> CAPTURED
+    Pledge->>DB: TX: Insert Outbox Event

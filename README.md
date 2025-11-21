@@ -388,3 +388,30 @@ Built for the API Avengers Microservices Hackathon.
 ## 📝 License
 
 MIT
+
+## 🚀 Load Testing & Performance
+
+We include a high-performance load testing suite to verify the system can handle **>1000 Requests Per Second (RPS)**.
+
+### Methodology
+Our load test uses a custom **Go-based high-concurrency tool** (`loadtest/main.go`) that spawns **200 concurrent workers** to simulate heavy traffic. The test runs in two phases:
+
+1.  **Mixed Traffic Phase (20s)**: Distributes load across multiple endpoints (`/campaigns`, `/health`, `/campaigns/:id`) to simulate realistic usage.
+2.  **Peak Traffic Phase (20s)**: Hammers the `/campaigns` endpoint to test maximum read throughput.
+
+### Running the Tests
+You can run the performance test as part of the full test suite:
+```bash
+./test-all-services.sh
+```
+
+Or run the load test standalone:
+```bash
+# Linux / Mac
+./measure_rps.sh
+
+# Windows
+.\measure_rps.ps1
+```
+
+The tool will output real-time RPS stats and a final pass/fail result based on the 1000 RPS target.

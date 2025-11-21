@@ -1,0 +1,75 @@
+graph TD
+    subgraph Client
+        Web[Web Frontend (Vite/React)]
+    end
+
+    subgraph Gateway Layer
+        API[API Gateway (Hono)]
+    end
+
+    subgraph Core Services
+        Auth[Auth Service]
+        Campaign[Campaign Service]
+        Pledge[Pledge Service]
+        Payment[Payment Service]
+        Notification[Notification Service]
+        Chat[Chat Service]
+    end
+
+    subgraph Infrastructure
+        NATS((NATS JetStream))
+        Redis[(Redis Cache)]
+        Postgres[(PostgreSQL)]
+        ES[(Elasticsearch)]
+        Jaeger[Jaeger Tracing]
+    end
+
+    subgraph External
+        Bank[Bank Service (Simulated)]
+    end
+
+    %% Client to Gateway
+    Web -->|HTTP/REST| API
+    Web -->|WebSocket| Chat
+    Web -->|WebSocket| Notification
+
+    %% Gateway to Services
+    API -->|Proxy| Auth
+    API -->|Proxy| Campaign
+    API -->|Proxy| Pledge
+    API -->|Proxy| Payment
+
+    %% Service Dependencies
+    Auth --> Postgres
+    Campaign --> Postgres
+    Campaign --> Redis
+    Pledge --> Postgres
+    Pledge --> Redis
+    Payment --> Redis
+    Bank --> Postgres
+
+    %% Event Driven
+    Campaign -.->|Pub| NATS
+    Pledge -.->|Pub| NATS
+    Payment -.->|Pub| NATS
+    
+    NATS -.->|Sub| Notification
+    NATS -.->|Sub| Pledge
+    NATS -.->|Sub| Campaign
+
+    %% Inter-service
+    Payment -->|HTTP| Bank
+
+    %% Observability
+    Auth -.->|Logs/Trace| ES
+    Campaign -.->|Logs/Trace| ES
+    Pledge -.->|Logs/Trace| ES
+    Payment -.->|Logs/Trace| ES
+    Bank -.->|Logs/Trace| ES
+    Gateway -.->|Logs/Trace| ES
+    
+    Auth -.->|Trace| Jaeger
+    Campaign -.->|Trace| Jaeger
+    Pledge -.->|Trace| Jaeger
+    Payment -.->|Trace| Jaeger
+    Bank -.->|Trace| Jaeger
