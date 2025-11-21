@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { db, pledges, outbox } from '@careforall/db';
+import { pledgesTotal } from '@careforall/common';
 
 const app = new Hono();
 
@@ -32,6 +33,9 @@ app.post('/', zValidator('json', createPledgeSchema), async (c) => {
 
       return pledge;
     });
+
+    // Update metrics
+    pledgesTotal.inc({ status: 'created' });
 
     return c.json(result, 201);
   } catch (error) {

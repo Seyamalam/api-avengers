@@ -94,7 +94,8 @@ app.get('/pledges/:id', jwtAuth(), proxy(SERVICES.pledge));
 app.post('/payments/webhook', proxy(SERVICES.payment));
 
 // Payment processing - requires auth
-app.post('/payments/process', jwtAuth(), proxy(SERVICES.payment));
+app.post('/payments/authorize', jwtAuth(), proxy(SERVICES.payment));
+app.post('/payments/capture', jwtAuth(), proxy(SERVICES.payment));
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 

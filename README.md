@@ -1,5 +1,25 @@
 # CareForAll - Microservices Hackathon Solution
 
+## ✅ Checkpoint 1: Architecture & Design Strategy
+
+We have successfully mapped out the **CareForAll** ecosystem with a fault-tolerant, scalable microservices architecture.
+
+### 🏗️ Architecture Highlights
+- **Microservices Boundaries**: Distinct services for Auth, Campaign, Pledge, Payment, and Banking, ensuring separation of concerns.
+- **Fault Tolerance**: Implemented **Idempotency** (Redis), **Outbox Pattern** (Reliable Events), and **Circuit Breakers**.
+- **Scalability Strategy**:
+  - **Horizontal Scaling**: Our stateless services (Campaign, Pledge) are designed to be scaled horizontally.
+  - **Database Replication**: We use a **Read Replica** (`postgres-replica`) to offload read traffic from the main database.
+  - **Cache Replication**: We use a **Redis Replica** (`redis-replica`) for high-availability caching.
+  - **Demonstration**: You can scale any service using Docker Compose:
+    ```bash
+    docker compose up -d --scale campaign=3 --scale pledge=2
+    ```
+- **Data Models**: Defined using **Drizzle ORM** in `packages/db`, ensuring type safety and clear schema definitions.
+- **Diagram**: See the [Architecture Overview](#architecture-overview) below for a visual representation.
+
+---
+
 ## Architecture Overview
 
 ```mermaid
@@ -17,12 +37,18 @@ graph TB
         CAMPAIGN[Campaign Service<br/>Port 3002]
         PLEDGE[Pledge Service<br/>Port 3003]
         PAYMENT[Payment Service<br/>Port 3004]
+        BANK[Bank Service<br/>Port 3005]
+        NOTIF[Notification Service<br/>Port 3006]
+        CHAT[Chat Service<br/>Port 3007]
         WORKER[Pledge Worker<br/>Outbox Pattern]
     end
     
     subgraph "Data Layer"
-        PG[(PostgreSQL<br/>Port 5432)]
+        PG[(PostgreSQL Main<br/>Port 5432)]
+        PG_BANK[(PostgreSQL Bank<br/>Port 5433)]
+        PG_REP[(PostgreSQL Replica<br/>Port 5434)]
         REDIS[(Redis Cache<br/>Port 6379)]
+        REDIS_REP[(Redis Replica<br/>Port 6380)]
     end
     
     subgraph "Messaging"
@@ -33,6 +59,7 @@ graph TB
         JAEGER[Jaeger<br/>Port 16686]
         PROM[Prometheus<br/>Port 9090]
         GRAFANA[Grafana<br/>Port 3000]
+        KIBANA[Kibana<br/>Port 5601]
     end
     
     WEB -->|HTTP| GW
@@ -40,6 +67,9 @@ graph TB
     GW -->|Proxy| CAMPAIGN
     GW -->|Proxy| PLEDGE
     GW -->|Proxy| PAYMENT
+    GW -->|Proxy| BANK
+    GW -->|Proxy| NOTIF
+    GW -->|Proxy| CHAT
     
     AUTH -->|Read/Write| PG
     CAMPAIGN -->|Read/Write| PG
@@ -47,6 +77,10 @@ graph TB
     PLEDGE -->|Read/Write| PG
     PLEDGE -->|Idempotency| REDIS
     PAYMENT -->|Idempotency| REDIS
+    BANK -->|Read/Write| PG_BANK
+    
+    PG -.->|Replication| PG_REP
+    REDIS -.->|Replication| REDIS_REP
     
     PLEDGE -->|Outbox Events| PG
     WORKER -->|Poll & Publish| PG
@@ -61,15 +95,46 @@ graph TB
     CAMPAIGN -.->|Traces| JAEGER
     PLEDGE -.->|Traces| JAEGER
     PAYMENT -.->|Traces| JAEGER
+    BANK -.->|Traces| JAEGER
     GW -.->|Traces| JAEGER
     
     AUTH -.->|Metrics| PROM
     CAMPAIGN -.->|Metrics| PROM
     PLEDGE -.->|Metrics| PROM
     PAYMENT -.->|Metrics| PROM
+    BANK -.->|Metrics| PROM
     
     PROM -->|Visualize| GRAFANA
 ```
+
+## Service Registry
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **Frontend** | `5173` | React Web Application |
+| **API Gateway** | `8080` | Unified entry point for all APIs |
+| **Auth Service** | `3001` | Authentication & Authorization |
+| **Campaign Service** | `3002` | Campaign management & public listing |
+| **Pledge Service** | `3003` | Donation processing & state machine |
+| **Payment Service** | `3004` | Payment gateway integration |
+| **Bank Service** | `3005` | Simulated banking system (Isolated DB) |
+| **Notification Service** | `3006` | Real-time WebSocket notifications |
+| **Chat Service** | `3007` | Real-time WebSocket chat rooms |
+
+## Infrastructure Components
+
+| Component | Port | Description |
+|-----------|------|-------------|
+| **PostgreSQL (Main)** | `5432` | Primary database for core services |
+| **PostgreSQL (Bank)** | `5433` | Dedicated database for Bank Service |
+| **PostgreSQL (Replica)** | `5434` | Read replica for Main DB |
+| **Redis (Primary)** | `6379` | Cache & Pub/Sub |
+| **Redis (Replica)** | `6380` | Read replica for Redis |
+| **NATS** | `4222` | Message Broker (JetStream enabled) |
+| **Jaeger** | `16686` | Distributed Tracing UI |
+| **Prometheus** | `9090` | Metrics Collection |
+| **Grafana** | `3000` | Metrics Visualization |
+| **Kibana** | `5601` | Log Analysis |
 
 ## Key Design Patterns
 
@@ -151,6 +216,23 @@ graph TB
 - **[Test Results](./TEST_RESULTS.md)** - Latest system test results
 - **[Test Script](./test-all-services.sh)** - Comprehensive automated testing
 - **[Environment Variables](./.env.example)** - Configuration template
+
+## 🎁 Bonus Features
+
+We have gone above and beyond to implement real-time features using WebSockets:
+
+### 🔔 Notification Service (Port 3006)
+- **Real-time Updates**: Broadcasts system events (Campaign Created, Pledge Made, Payment Succeeded) to connected clients.
+- **Tech Stack**: Hono, Bun, NATS (Sub), WebSockets.
+- **Integration**: Subscribes to NATS subjects and pushes updates to the frontend.
+
+### 💬 Chat Service (Port 3007)
+- **Real-time Chat**: Allows users to join rooms and chat in real-time.
+- **Tech Stack**: Hono, Bun, WebSockets.
+- **Features**: Room management, user presence, message broadcasting.
+
+### 🐳 Dockerized Everything
+- All services, including the new Notification and Chat services, are fully containerized and orchestrated via `docker-compose`.
 
 ## 🔒 Security Features
 

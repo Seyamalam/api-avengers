@@ -18,7 +18,7 @@
       },
       "targets": [
         {
-          "expr": "campaign_service_up",
+          "expr": "sum(campaigns_total)",
           "legendFormat": "Total",
           "refId": "A"
         }
@@ -64,7 +64,7 @@
       },
       "targets": [
         {
-          "expr": "pledge_service_up",
+          "expr": "sum(pledges_total)",
           "legendFormat": "Pledges",
           "refId": "A"
         }
@@ -102,7 +102,7 @@
       },
       "targets": [
         {
-          "expr": "sum(campaign_total_amount)",
+          "expr": "sum(donation_amount_total) / 100",
           "legendFormat": "Total Raised",
           "refId": "A"
         }
@@ -148,7 +148,7 @@
       },
       "targets": [
         {
-          "expr": "rate(pledges_captured_total[5m]) / rate(pledges_created_total[5m]) * 100",
+          "expr": "sum(rate(payment_succeeded_total[5m])) / (sum(rate(payment_succeeded_total[5m])) + sum(rate(payment_failed_total[5m]))) * 100",
           "legendFormat": "Success %",
           "refId": "A"
         }
@@ -189,7 +189,7 @@
       },
       "targets": [
         {
-          "expr": "rate(campaigns_created_total[5m])",
+          "expr": "rate(campaigns_total[5m])",
           "legendFormat": "Campaigns/sec",
           "refId": "A"
         }
@@ -215,7 +215,7 @@
       },
       "targets": [
         {
-          "expr": "rate(pledges_created_total[5m])",
+          "expr": "rate(pledges_total[5m])",
           "legendFormat": "Pledges/sec",
           "refId": "A"
         }
@@ -241,7 +241,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (pledge_status_count)",
+          "expr": "sum by (status) (pledges_total)",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -292,7 +292,7 @@
       },
       "targets": [
         {
-          "expr": "avg(pledge_amount)",
+          "expr": "sum(donation_amount_total) / sum(pledges_total) / 100",
           "legendFormat": "Avg Amount",
           "refId": "A"
         }

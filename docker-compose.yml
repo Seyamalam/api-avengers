@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: careforall
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -19,18 +17,66 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-bank:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: bank
+    volumes:
+      - postgres_bank_data:/var/lib/postgresql/data
+    networks:
+      - careforall-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d bank"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-replica:
+    image: postgres:16-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - careforall-net
+
   db-migrate:
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "bun run db:push && bun packages/db/init-admin.ts"
+    command: sh -c "bun run db:push:app && DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-bank:5432/bank bun run db:push:bank && bun packages/db/init-admin.ts"
     environment:
-      - DATABASE_URL=postgresql://user:password@postgres:5432/careforall
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     networks:
       - careforall-net
     depends_on:
       postgres:
         condition: service_healthy
+      postgres-bank:
+        condition: service_healthy
+    restart: "no"
+
+  db-init-bank:
+    image: postgres:16-alpine
+    command: sh /init-bank.sh
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: bank
+      PGHOST: postgres-bank
+    volumes:
+      - ./infra/postgres/init-bank.sh:/init-bank.sh
+    networks:
+      - careforall-net
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
     restart: "no"
 
   redis:
@@ -46,6 +92,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis-replica:
+    image: redis:7-alpine
+    command: redis-server --replicaof redis 6379
+    ports:
+      - "6380:6379"
+    networks:
+      - careforall-net
+    depends_on:
+      - redis
 
   nats:
     image: nats:2.10-alpine
@@ -86,8 +142,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
@@ -139,7 +195,8 @@ services:
       - CAMPAIGN_SERVICE_URL=http://campaign:3002
       - PLEDGE_SERVICE_URL=http://pledge:3003
       - PAYMENT_SERVICE_URL=http://payment:3004
-      - JWT_SECRET=hackathon-demo-secret-key-change-in-production-environment
+      - BANK_SERVICE_URL=http://bank:3005
+      - JWT_SECRET=${JWT_SECRET}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       db-migrate:
@@ -152,6 +209,8 @@ services:
         condition: service_started
       payment:
         condition: service_started
+      bank:
+        condition: service_started
     networks:
       - careforall-net
 
@@ -161,8 +220,8 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
-      - JWT_SECRET=hackathon-demo-secret-key-change-in-production-environment
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - JWT_SECRET=${JWT_SECRET}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       db-migrate:
@@ -176,7 +235,7 @@ services:
     ports:
       - "3002:3002"
     environment:
-      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - NATS_URL=nats://nats:4222
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
@@ -196,7 +255,7 @@ services:
     ports:
       - "3003:3003"
     environment:
-      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - NATS_URL=nats://nats:4222
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
@@ -212,7 +271,7 @@ services:
     build: .
     command: ["bun", "run", "apps/pledge/src/worker.ts"]
     environment:
-      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - NATS_URL=nats://nats:4222
     depends_on:
       db-migrate:
@@ -230,12 +289,57 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - NATS_URL=nats://nats:4222
+      - BANK_SERVICE_URL=http://bank:3005
+      - PAYMENT_WEBHOOK_URL=http://payment:3004
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       redis:
         condition: service_healthy
       nats:
         condition: service_healthy
+      bank:
+        condition: service_started
+    networks:
+      - careforall-net
+
+  bank:
+    build: .
+    command: ["bun", "run", "apps/bank/src/index.ts"]
+    ports:
+      - "3005:3005"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-bank:5432/bank
+      - PORT=3005
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      db-init-bank:
+        condition: service_completed_successfully
+    networks:
+      - careforall-net
+
+  notification:
+    build: .
+    command: ["bun", "run", "apps/notification/src/index.ts"]
+    ports:
+      - "3006:3006"
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PORT=3006
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - careforall-net
+
+  chat:
+    build: .
+    command: ["bun", "run", "apps/chat/src/index.ts"]
+    ports:
+      - "3007:3007"
+    environment:
+      - PORT=3007
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     networks:
       - careforall-net
 
@@ -256,6 +360,7 @@ networks:
 
 volumes:
   postgres_data:
+  postgres_bank_data:
   redis_data:
   grafana_data:
   elasticsearch_data:

@@ -1,7 +1,7 @@
 import { natsClient } from '@careforall/events';
 import { db, campaigns } from '@careforall/db';
 import { eq, sql } from 'drizzle-orm';
-import { logger } from '@careforall/common';
+import { logger, donationAmount, campaignCurrentAmount } from '@careforall/common';
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -19,18 +19,25 @@ export async function startConsumers() {
     try {
       // Only update campaign total when pledge is CAPTURED
       if (pledge.status === 'CAPTURED') {
+        let newAmount = 0;
         await db.transaction(async (tx) => {
           // Increment campaign currentAmount
-          await tx
+          const [updatedCampaign] = await tx
             .update(campaigns)
             .set({
               currentAmount: sql`${campaigns.currentAmount} + ${pledge.amount}`,
               updatedAt: new Date(),
             })
-            .where(eq(campaigns.id, pledge.campaignId));
+            .where(eq(campaigns.id, pledge.campaignId))
+            .returning();
 
+          newAmount = updatedCampaign.currentAmount;
           logger.info(`Updated campaign ${pledge.campaignId} total by +${pledge.amount}`);
         });
+
+        // Update metrics
+        donationAmount.inc(pledge.amount);
+        campaignCurrentAmount.set({ campaign_id: pledge.campaignId.toString() }, newAmount);
 
         // Invalidate cache for this campaign
         await redis.del(`campaign:${pledge.campaignId}`);

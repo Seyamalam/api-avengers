@@ -7,7 +7,7 @@ import { paymentRoutes } from './routes/payment';
 // Validate environment variables
 validateEnv({
   required: ['REDIS_URL', 'NATS_URL'],
-  optional: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+  optional: ['OTEL_EXPORTER_OTLP_ENDPOINT', 'BANK_SERVICE_URL', 'PAYMENT_WEBHOOK_URL'],
 });
 
 initTelemetry('payment-service');

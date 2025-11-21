@@ -10,6 +10,9 @@ AUTH_URL="http://localhost:3001"
 CAMPAIGN_URL="http://localhost:3002"
 PLEDGE_URL="http://localhost:3003"
 PAYMENT_URL="http://localhost:3004"
+BANK_URL="http://localhost:3005"
+NOTIFICATION_URL="http://localhost:3006"
+CHAT_URL="http://localhost:3007"
 
 # Colors
 GREEN='\033[0;32m'
@@ -59,6 +62,9 @@ test_health "Auth Service" "$AUTH_URL"
 test_health "Campaign Service" "$CAMPAIGN_URL"
 test_health "Pledge Service" "$PLEDGE_URL"
 test_health "Payment Service" "$PAYMENT_URL"
+test_health "Bank Service" "$BANK_URL"
+test_health "Notification Service" "$NOTIFICATION_URL"
+test_health "Chat Service" "$CHAT_URL"
 
 # ===========================================
 # SECTION 2: AUTHENTICATION
@@ -272,34 +278,50 @@ else
 fi
 echo ""
 
-# Test 4.3: Capture Payment Directly (State: PENDING → CAPTURED)
-echo -e "${YELLOW}Test 4.3: Capture Payment (State: PENDING → CAPTURED)${NC}"
-CAPTURE_WEBHOOK=$(curl -s -X POST "$GATEWAY_URL/payments/webhook" \
+# Test 4.3: Authorize Payment (Pledge -> Payment -> Bank)
+echo -e "${YELLOW}Test 4.3: Authorize Payment (Pledge -> Payment -> Bank)${NC}"
+AUTHORIZE_RESPONSE=$(curl -s -X POST "$GATEWAY_URL/payments/authorize" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $USER_TOKEN" \
   -d "{
-    \"eventId\": \"capture-$(date +%s)-$$\",
     \"pledgeId\": $PLEDGE_ID,
-    \"status\": \"succeeded\"
+    \"amount\": 1500,
+    \"accountNumber\": \"ACC001\"
   }")
 
-echo -e "${GREEN}✓ Capture webhook processed${NC}"
-echo "$CAPTURE_WEBHOOK" | jq -C '.'
+HOLD_ID=$(echo "$AUTHORIZE_RESPONSE" | jq -r '.holdId')
+
+if [ "$HOLD_ID" != "null" ] && [ -n "$HOLD_ID" ]; then
+  echo -e "${GREEN}✓ Payment authorized (Hold ID: $HOLD_ID)${NC}"
+  echo "$AUTHORIZE_RESPONSE" | jq -C '.'
+else
+  echo -e "${RED}✗ Payment authorization failed${NC}"
+  echo "$AUTHORIZE_RESPONSE" | jq -C '.'
+fi
 echo ""
 
-# Test 4.4: Test Failed Payment
-echo -e "${YELLOW}Test 4.4: Test Failed Payment (Different Pledge)${NC}"
-FAILED_WEBHOOK=$(curl -s -X POST "$GATEWAY_URL/payments/webhook" \
+# Test 4.4: Capture Payment (Payment -> Bank)
+echo -e "${YELLOW}Test 4.4: Capture Payment (Payment -> Bank)${NC}"
+CAPTURE_RESPONSE=$(curl -s -X POST "$GATEWAY_URL/payments/capture" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $USER_TOKEN" \
   -d "{
-    \"eventId\": \"failed-$(date +%s)-$$\",
     \"pledgeId\": $PLEDGE_ID,
-    \"status\": \"failed\"
+    \"holdId\": \"$HOLD_ID\"
   }")
 
-echo -e "${GREEN}✓ Failed payment webhook processed${NC}"
-echo "$FAILED_WEBHOOK" | jq -C '.'
+TRANSACTION_ID=$(echo "$CAPTURE_RESPONSE" | jq -r '.transactionId')
+
+if [ "$TRANSACTION_ID" != "null" ] && [ -n "$TRANSACTION_ID" ]; then
+  echo -e "${GREEN}✓ Payment captured (Transaction ID: $TRANSACTION_ID)${NC}"
+  echo "$CAPTURE_RESPONSE" | jq -C '.'
+else
+  echo -e "${RED}✗ Payment capture failed${NC}"
+  echo "$CAPTURE_RESPONSE" | jq -C '.'
+fi
 echo ""
-echo -e "${YELLOW}Test 4.5: Verify Campaign Total (Event-Driven Update)${NC}"
+
+# Test 4.5: Verify Campaign Total (Event-Driven Update)
 echo "Waiting 3 seconds for async event processing..."
 sleep 3
 

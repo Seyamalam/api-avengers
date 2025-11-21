@@ -1,7 +1,7 @@
 import { db } from './src/client';
 import { users } from './src/schema';
 import { eq } from 'drizzle-orm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 async function initAdmin() {
   try {

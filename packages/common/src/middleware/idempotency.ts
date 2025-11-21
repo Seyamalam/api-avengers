@@ -10,8 +10,8 @@ function getRedis() {
   return redis;
 }
 
-export const idempotency = () => createMiddleware(async (c, next) => {
-  const idempotencyKey = c.req.header('x-idempotency-key');
+export const idempotency = (keySelector?: (c: any) => string | undefined) => createMiddleware(async (c, next) => {
+  const idempotencyKey = keySelector ? keySelector(c) : c.req.header('x-idempotency-key');
 
   if (!idempotencyKey) {
     await next();

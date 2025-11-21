@@ -11,6 +11,8 @@
     "db:generate": "cd packages/db && drizzle-kit generate",
     "db:migrate": "cd packages/db && drizzle-kit migrate",
     "db:push": "cd packages/db && drizzle-kit push",
+    "db:push:app": "cd packages/db && bun run push:app",
+    "db:push:bank": "cd packages/db && bun run push:bank",
     "db:studio": "cd packages/db && drizzle-kit studio"
   },
   "devDependencies": {

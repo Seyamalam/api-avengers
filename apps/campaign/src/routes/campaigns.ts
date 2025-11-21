@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db, campaigns } from '@careforall/db';
 import { eq } from 'drizzle-orm';
 import { natsClient } from '@careforall/events';
+import { campaignsTotal } from '@careforall/common';
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -26,6 +27,9 @@ app.post(
   if (!campaign) {
     return c.json({ error: 'Failed to create campaign' }, 500);
   }
+
+  // Update metrics
+  campaignsTotal.inc();
 
   // Publish event
   await natsClient.publish('campaign.created', campaign);

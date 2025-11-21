@@ -57,6 +57,18 @@ export const campaignCurrentAmount = new Gauge({
   registers: [register]
 });
 
+export const paymentSucceededTotal = new Counter({
+  name: 'payment_succeeded_total',
+  help: 'Total number of successful payments',
+  registers: [register]
+});
+
+export const paymentFailedTotal = new Counter({
+  name: 'payment_failed_total',
+  help: 'Total number of failed payments',
+  registers: [register]
+});
+
 // NATS/Event metrics
 export const eventsPublished = new Counter({
   name: 'events_published_total',
