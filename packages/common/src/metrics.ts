@@ -90,6 +90,14 @@ export const outboxQueueDepth = new Gauge({
   registers: [register]
 });
 
+export const eventProcessingDuration = new Histogram({
+  name: 'event_processing_duration_seconds',
+  help: 'Duration of event processing in seconds',
+  labelNames: ['event_type', 'status'],
+  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+  registers: [register]
+});
+
 // Database metrics
 export const dbConnectionsActive = new Gauge({
   name: 'db_connections_active',

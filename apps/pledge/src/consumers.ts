@@ -1,7 +1,7 @@
 import { natsClient } from '@careforall/events';
 import { db, pledges, outbox } from '@careforall/db';
 import { eq } from 'drizzle-orm';
-import { logger, canTransition, mapPaymentStatusToPledge } from '@careforall/common';
+import { logger, canTransition, mapPaymentStatusToPledge, eventProcessingDuration, eventsConsumed } from '@careforall/common';
 
 export async function startConsumers() {
   await natsClient.connect([process.env.NATS_URL || 'nats://localhost:4222']);
@@ -9,6 +9,7 @@ export async function startConsumers() {
   logger.info('Pledge consumers started');
 
   natsClient.subscribe('payment.update', async (data: any) => {
+    const start = Date.now();
     const { pledgeId, status } = data;
     logger.info(`Received payment.update for pledge ${pledgeId}: ${status}`);
 
@@ -19,6 +20,7 @@ export async function startConsumers() {
         
         if (!pledge) {
           logger.error(`Pledge not found: ${pledgeId}`);
+          eventsConsumed.inc({ event_type: 'payment.update', status: 'error' });
           return;
         }
 
@@ -31,12 +33,14 @@ export async function startConsumers() {
           logger.warn(
             `Invalid state transition for pledge ${pledgeId}: ${currentStatus} -> ${newStatus}. Ignoring.`
           );
+          eventsConsumed.inc({ event_type: 'payment.update', status: 'ignored' });
           return;
         }
 
         // Skip if already at this status (idempotent)
         if (currentStatus === newStatus) {
           logger.info(`Pledge ${pledgeId} already at status ${newStatus}`);
+          eventsConsumed.inc({ event_type: 'payment.update', status: 'skipped' });
           return;
         }
 
@@ -48,19 +52,23 @@ export async function startConsumers() {
           })
           .where(eq(pledges.id, pledgeId))
           .returning();
-
-        // 4. Write to Outbox
+        
+        // 5. Outbox Pattern: Publish event
         await tx.insert(outbox).values({
-          aggregateType: 'pledge',
-          aggregateId: pledge.id.toString(),
           eventType: 'pledge.updated',
           payload: updatedPledge,
         });
-        
-        logger.info(`Updated pledge ${pledgeId} to ${newStatus} and queued event`);
       });
+
+      const duration = (Date.now() - start) / 1000;
+      eventProcessingDuration.observe({ event_type: 'payment.update', status: 'success' }, duration);
+      eventsConsumed.inc({ event_type: 'payment.update', status: 'success' });
+
     } catch (error) {
-      logger.error(`Error processing payment.update for pledge ${pledgeId}`, error);
+      logger.error('Error processing payment.update', error);
+      const duration = (Date.now() - start) / 1000;
+      eventProcessingDuration.observe({ event_type: 'payment.update', status: 'error' }, duration);
+      eventsConsumed.inc({ event_type: 'payment.update', status: 'error' });
     }
   });
 }

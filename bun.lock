@@ -6,7 +6,7 @@
       "name": "care-for-all",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "drizzle-orm": "^0.44.7",
+        "drizzle-orm": "0.44.7",
         "hono": "^4.10.6",
         "jsonwebtoken": "^9.0.2",
         "pg": "^8.16.3",

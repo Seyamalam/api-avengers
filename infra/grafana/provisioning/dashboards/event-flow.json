@@ -106,7 +106,7 @@
       },
       "targets": [
         {
-          "expr": "rate(outbox_processed_total[1m])",
+          "expr": "rate(events_published_total[1m])",
           "legendFormat": "Events/sec",
           "refId": "A"
         }
@@ -195,7 +195,7 @@
       },
       "targets": [
         {
-          "expr": "outbox_pending_events",
+          "expr": "outbox_queue_depth",
           "legendFormat": "Pending Events",
           "refId": "A"
         }

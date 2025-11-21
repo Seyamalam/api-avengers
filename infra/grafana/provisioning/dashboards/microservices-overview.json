@@ -228,7 +228,7 @@
       "targets": [
         {
           "expr": "rate(http_requests_total{service=\"gateway\"}[5m])",
-          "legendFormat": "{{method}} {{path}}",
+          "legendFormat": "{{method}} {{route}}",
           "refId": "A"
         }
       ],
@@ -279,7 +279,7 @@
       "targets": [
         {
           "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
-          "legendFormat": "{{service}} - {{method}} {{path}}",
+          "legendFormat": "{{service}} - {{method}} {{route}}",
           "refId": "A"
         }
       ],
@@ -329,7 +329,7 @@
       },
       "targets": [
         {
-          "expr": "rate(nats_messages_published_total[5m])",
+          "expr": "rate(events_published_total[5m])",
           "legendFormat": "{{event_type}}",
           "refId": "A"
         }
@@ -352,7 +352,7 @@
       },
       "targets": [
         {
-          "expr": "pg_stat_database_numbackends{datname=\"careforall\"}",
+          "expr": "db_connections_active",
           "legendFormat": "Active Connections",
           "refId": "A"
         }
