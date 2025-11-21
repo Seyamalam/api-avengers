@@ -1,0 +1,30 @@
+{
+  "name": "care-for-all",
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "dev": "bun run --filter '*' dev",
+    "db:generate": "cd packages/db && drizzle-kit generate",
+    "db:migrate": "cd packages/db && drizzle-kit migrate",
+    "db:push": "cd packages/db && drizzle-kit push",
+    "db:studio": "cd packages/db && drizzle-kit studio"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.7",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.5",
+    "drizzle-orm": "^0.44.7",
+    "hono": "^4.10.6",
+    "pg": "^8.16.3",
+    "vite": "^7.2.4",
+    "zod": "^4.1.12"
+  }
+}

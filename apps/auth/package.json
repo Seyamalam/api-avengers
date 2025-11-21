@@ -1,0 +1,20 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@careforall/common": "workspace:*",
+    "@careforall/db": "workspace:*",
+    "@careforall/telemetry": "workspace:*",
+    "bcryptjs": "^2.4.3",
+    "hono": "^4.10.6",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/bun": "latest",
+    "@types/jsonwebtoken": "^9.0.10"
+  }
+}

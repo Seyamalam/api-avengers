@@ -1,0 +1,13 @@
+{
+  "name": "@careforall/common",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "dependencies": {
+    "hono": "^4.10.6",
+    "ioredis": "^5.8.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

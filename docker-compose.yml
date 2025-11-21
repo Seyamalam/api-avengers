@@ -1,0 +1,234 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: careforall
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - careforall-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d careforall"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - careforall-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["-js", "-m", "8222"]
+    networks:
+      - careforall-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - careforall-net
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - careforall-net
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - careforall-net
+    depends_on:
+      - prometheus
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - careforall-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - careforall-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  gateway:
+    build: .
+    command: ["bun", "run", "apps/gateway/src/index.ts"]
+    ports:
+      - "8080:8080"
+    environment:
+      - AUTH_SERVICE_URL=http://auth:3001
+      - CAMPAIGN_SERVICE_URL=http://campaign:3002
+      - PLEDGE_SERVICE_URL=http://pledge:3003
+      - PAYMENT_SERVICE_URL=http://payment:3004
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      - auth
+      - campaign
+      - pledge
+      - payment
+    networks:
+      - careforall-net
+
+  auth:
+    build: .
+    command: ["bun", "run", "apps/auth/src/index.ts"]
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - careforall-net
+
+  campaign:
+    build: .
+    command: ["bun", "run", "apps/campaign/src/index.ts"]
+    ports:
+      - "3002:3002"
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - careforall-net
+
+  pledge:
+    build: .
+    command: ["bun", "run", "apps/pledge/src/index.ts"]
+    ports:
+      - "3003:3003"
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - careforall-net
+
+  pledge-worker:
+    build: .
+    command: ["bun", "run", "apps/pledge/src/worker.ts"]
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - careforall-net
+
+  payment:
+    build: .
+    command: ["bun", "run", "apps/payment/src/index.ts"]
+    ports:
+      - "3004:3004"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - careforall-net
+
+  web:
+    build: .
+    command: ["bun", "run", "--cwd", "apps/web", "dev", "--host"]
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+      - VITE_API_TARGET=http://gateway:8080
+    networks:
+      - careforall-net
+
+networks:
+  careforall-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+  elasticsearch_data:
