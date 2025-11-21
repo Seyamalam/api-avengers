@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { logger, idempotency, performHealthCheck, validateEnv } from '@careforall/common';
+import { logger, idempotency, performHealthCheck, validateEnv, register, httpRequestCounter, httpRequestDuration } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { pledgeRoutes } from './routes/pledges';
 import { startConsumers } from './consumers';
@@ -20,8 +20,19 @@ startConsumers().catch(err => {
 });
 
 app.use('*', async (c, next) => {
-  logger.info(`[${c.req.method}] ${c.req.url}`);
+  const start = Date.now();
+  const route = c.req.path;
+  const method = c.req.method;
+  
+  logger.info(`[${method}] ${c.req.url}`);
+  
   await next();
+  
+  const duration = (Date.now() - start) / 1000;
+  const status = c.res.status.toString();
+  
+  httpRequestCounter.inc({ method, route, status, service: 'pledge' });
+  httpRequestDuration.observe({ method, route, status, service: 'pledge' }, duration);
 });
 
 // Apply idempotency middleware globally or to specific routes
@@ -33,11 +44,10 @@ app.get('/health', async (c) => {
   return c.json({ status: 'ok', service: 'pledge' });
 });
 
-app.get('/metrics', (c) => {
-  return c.text(`# HELP pledge_service_up Pledge service is running
-# TYPE pledge_service_up gauge
-pledge_service_up 1
-`);
+app.get('/metrics', async (c) => {
+  const metrics = await register.metrics();
+  c.header('Content-Type', register.contentType);
+  return c.text(metrics);
 });
 
 export default {

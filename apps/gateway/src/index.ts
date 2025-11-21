@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger, jwtAuth, requireRole, validateEnv, validateJWTSecret } from '@careforall/common';
+import { logger, jwtAuth, requireRole, validateEnv, validateJWTSecret, register, httpRequestCounter, httpRequestDuration } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 
 // Validate environment variables
@@ -35,9 +35,21 @@ const SERVICES = {
   payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004',
 };
 
+// Metrics middleware
 app.use('*', async (c, next) => {
-  logger.info(`[Gateway] ${c.req.method} ${c.req.url}`);
+  const start = Date.now();
+  const route = c.req.path;
+  const method = c.req.method;
+  
+  logger.info(`[Gateway] ${method} ${c.req.url}`);
+  
   await next();
+  
+  const duration = (Date.now() - start) / 1000;
+  const status = c.res.status.toString();
+  
+  httpRequestCounter.inc({ method, route, status, service: 'gateway' });
+  httpRequestDuration.observe({ method, route, status, service: 'gateway' }, duration);
 });
 
 const proxy = (serviceUrl: string) => async (c: any) => {
@@ -86,11 +98,10 @@ app.post('/payments/process', jwtAuth(), proxy(SERVICES.payment));
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
-app.get('/metrics', (c) => {
-  return c.text(`# HELP gateway_service_up Gateway service is running
-# TYPE gateway_service_up gauge
-gateway_service_up 1
-`);
+app.get('/metrics', async (c) => {
+  const metrics = await register.metrics();
+  c.header('Content-Type', register.contentType);
+  return c.text(metrics);
 });
 
 export default {

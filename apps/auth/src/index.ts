@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { logger, performHealthCheck, validateEnv, validateJWTSecret } from '@careforall/common';
+import { logger, performHealthCheck, validateEnv, validateJWTSecret, register, httpRequestCounter, httpRequestDuration } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { authRoutes } from './routes/auth';
 
@@ -15,8 +15,19 @@ initTelemetry('auth-service');
 const app = new Hono();
 
 app.use('*', async (c, next) => {
-  logger.info(`[${c.req.method}] ${c.req.url}`);
+  const start = Date.now();
+  const route = c.req.path;
+  const method = c.req.method;
+  
+  logger.info(`[${method}] ${c.req.url}`);
+  
   await next();
+  
+  const duration = (Date.now() - start) / 1000;
+  const status = c.res.status.toString();
+  
+  httpRequestCounter.inc({ method, route, status, service: 'auth' });
+  httpRequestDuration.observe({ method, route, status, service: 'auth' }, duration);
 });
 
 app.route('/auth', authRoutes);
@@ -25,12 +36,10 @@ app.get('/health', async (c) => {
   return c.json({ status: 'ok', service: 'auth' });
 });
 
-app.get('/metrics', (c) => {
-  // Basic metrics - can be enhanced with prom-client
-  return c.text(`# HELP auth_service_up Auth service is running
-# TYPE auth_service_up gauge
-auth_service_up 1
-`);
+app.get('/metrics', async (c) => {
+  const metrics = await register.metrics();
+  c.header('Content-Type', register.contentType);
+  return c.text(metrics);
 });
 
 export default {

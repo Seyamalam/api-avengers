@@ -11,7 +11,6 @@ services:
       POSTGRES_DB: careforall
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/postgres/init-admin.sh:/docker-entrypoint-initdb.d/init-admin.sh
     networks:
       - careforall-net
     healthcheck:
@@ -19,6 +18,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "bun run db:push && bun packages/db/init-admin.ts"
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/careforall
+    networks:
+      - careforall-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   redis:
     image: redis:7-alpine
@@ -129,10 +142,16 @@ services:
       - JWT_SECRET=hackathon-demo-secret-key-change-in-production-environment
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
-      - auth
-      - campaign
-      - pledge
-      - payment
+      db-migrate:
+        condition: service_completed_successfully
+      auth:
+        condition: service_started
+      campaign:
+        condition: service_started
+      pledge:
+        condition: service_started
+      payment:
+        condition: service_started
     networks:
       - careforall-net
 
@@ -146,8 +165,8 @@ services:
       - JWT_SECRET=hackathon-demo-secret-key-change-in-production-environment
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     networks:
       - careforall-net
 
@@ -162,8 +181,8 @@ services:
       - NATS_URL=nats://nats:4222
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       nats:
@@ -182,8 +201,8 @@ services:
       - NATS_URL=nats://nats:4222
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       nats:
         condition: service_healthy
     networks:
@@ -196,8 +215,8 @@ services:
       - DATABASE_URL=postgres://user:password@postgres:5432/careforall
       - NATS_URL=nats://nats:4222
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       nats:
         condition: service_healthy
     networks:

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { logger, performHealthCheck, validateEnv } from '@careforall/common';
+import { logger, performHealthCheck, validateEnv, register, httpRequestCounter, httpRequestDuration } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { natsClient } from '@careforall/events';
 import { paymentRoutes } from './routes/payment';
@@ -19,8 +19,19 @@ natsClient.connect([process.env.NATS_URL || 'nats://localhost:4222']).catch(err 
 });
 
 app.use('*', async (c, next) => {
-  logger.info(`[${c.req.method}] ${c.req.url}`);
+  const start = Date.now();
+  const route = c.req.path;
+  const method = c.req.method;
+  
+  logger.info(`[${method}] ${c.req.url}`);
+  
   await next();
+  
+  const duration = (Date.now() - start) / 1000;
+  const status = c.res.status.toString();
+  
+  httpRequestCounter.inc({ method, route, status, service: 'payment' });
+  httpRequestDuration.observe({ method, route, status, service: 'payment' }, duration);
 });
 
 app.route('/payments', paymentRoutes);
@@ -29,11 +40,10 @@ app.get('/health', async (c) => {
   return c.json({ status: 'ok', service: 'payment' });
 });
 
-app.get('/metrics', (c) => {
-  return c.text(`# HELP payment_service_up Payment service is running
-# TYPE payment_service_up gauge
-payment_service_up 1
-`);
+app.get('/metrics', async (c) => {
+  const metrics = await register.metrics();
+  c.header('Content-Type', register.contentType);
+  return c.text(metrics);
 });
 
 export default {
