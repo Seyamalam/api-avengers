@@ -1,7 +1,14 @@
 import { Hono } from 'hono';
-import { logger } from '@careforall/common';
+import { logger, performHealthCheck, validateEnv, validateJWTSecret } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { authRoutes } from './routes/auth';
+
+// Validate environment variables
+validateEnv({
+  required: ['DATABASE_URL', 'JWT_SECRET'],
+  optional: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+});
+validateJWTSecret();
 
 initTelemetry('auth-service');
 
@@ -14,7 +21,9 @@ app.use('*', async (c, next) => {
 
 app.route('/auth', authRoutes);
 
-app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/health', async (c) => {
+  return c.json({ status: 'ok', service: 'auth' });
+});
 
 app.get('/metrics', (c) => {
   // Basic metrics - can be enhanced with prom-client

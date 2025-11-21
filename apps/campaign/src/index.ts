@@ -1,9 +1,15 @@
 import { Hono } from 'hono';
-import { logger } from '@careforall/common';
+import { logger, performHealthCheck, validateEnv } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { natsClient } from '@careforall/events';
 import { campaignRoutes } from './routes/campaigns';
 import { startConsumers } from './consumers';
+
+// Validate environment variables
+validateEnv({
+  required: ['DATABASE_URL', 'REDIS_URL', 'NATS_URL'],
+  optional: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+});
 
 initTelemetry('campaign-service');
 
@@ -26,7 +32,9 @@ app.use('*', async (c, next) => {
 
 app.route('/campaigns', campaignRoutes);
 
-app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/health', async (c) => {
+  return c.json({ status: 'ok', service: 'campaign' });
+});
 
 app.get('/metrics', (c) => {
   return c.text(`# HELP campaign_service_up Campaign service is running

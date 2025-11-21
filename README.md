@@ -141,3 +141,151 @@ graph TB
 ## Development
 - Run `bun install` to install dependencies.
 - Run `bun run dev` in specific app folders.
+
+## 📚 Documentation
+
+- **[Quick Start Guide](./QUICKSTART.md)** - Setup and testing instructions for judges
+- **[Credentials & Access](./CREDENTIALS.md)** - 🔑 All login credentials, database access, and service URLs
+- **[Security Documentation](./SECURITY.md)** - Authentication, authorization, and security best practices
+- **[Progress Tracker](./HACKATHON_FIXES.md)** - Implementation status and checklist
+- **[Test Results](./TEST_RESULTS.md)** - Latest system test results
+- **[Test Script](./test-all-services.sh)** - Comprehensive automated testing
+- **[Environment Variables](./.env.example)** - Configuration template
+
+## 🔒 Security Features
+
+### Authentication & Authorization
+- **JWT-based authentication** with 24-hour token expiry
+- **Role-based access control (RBAC)** for admin operations
+- **Password hashing** with bcrypt (10 rounds)
+- **Protected endpoints** require valid JWT tokens
+
+### Data Protection
+- **Idempotency protection** prevents duplicate charges
+- **State machine validation** prevents invalid transitions
+- **Input validation** with Zod schemas on all endpoints
+- **SQL injection protection** via Drizzle ORM
+
+### Security Monitoring
+- **Structured logging** of authentication events
+- **Health checks** verify all service dependencies
+- **Environment validation** at startup
+- **CORS configuration** restricts origins
+
+See [SECURITY.md](./SECURITY.md) for comprehensive security documentation.
+
+## 🧪 Testing
+
+Run the complete test suite:
+```bash
+bun test
+```
+
+Run specific tests:
+```bash
+bun test packages/common/test/state-machine.test.ts
+bun test apps/payment/test/idempotency.test.ts
+```
+
+Run system integration test:
+```bash
+./test-system.sh
+```
+
+## 📊 Monitoring & Observability
+
+### Traces (Jaeger)
+View end-to-end request traces at http://localhost:16686
+- Select service to trace
+- View distributed spans across microservices
+- Analyze latency bottlenecks
+
+### Metrics (Prometheus + Grafana)
+- **Prometheus**: http://localhost:9090 - Query metrics directly
+- **Grafana**: http://localhost:3000 - Visualize metrics (admin/admin)
+- All services expose `/metrics` endpoints
+
+### Logs (Elasticsearch + Kibana)
+- **Kibana**: http://localhost:5601 - Search and analyze logs
+- **Elasticsearch**: http://localhost:9200 - Log storage
+- Structured JSON logging across all services
+
+## 🏗️ Project Structure
+
+```
+api-avengers/
+├── apps/
+│   ├── auth/          # Authentication service (JWT)
+│   ├── campaign/      # Campaign management + CQRS
+│   ├── pledge/        # Pledge processing + Outbox pattern
+│   ├── payment/       # Payment provider simulation
+│   ├── gateway/       # API Gateway + routing
+│   └── web/           # React frontend + Admin panel
+├── packages/
+│   ├── common/        # Shared utilities (logger, middleware, state machine)
+│   ├── db/            # Database schema + Drizzle ORM
+│   ├── events/        # NATS client wrapper
+│   └── telemetry/     # OpenTelemetry configuration
+├── infra/
+│   └── prometheus/    # Prometheus configuration
+├── .github/
+│   └── workflows/     # CI/CD pipeline
+└── docker-compose.yml # Full stack orchestration
+```
+
+## 🚀 CI/CD Pipeline
+
+GitHub Actions workflow provides:
+- ✅ Automated testing on PR
+- ✅ Type checking and linting
+- ✅ Smart service detection (only builds changed services)
+- ✅ Docker image building with semantic versioning
+- ✅ Integration tests with real services
+
+## 🎯 Key Features Demonstrated
+
+### 1. Transactional Outbox Pattern
+Ensures reliable event publishing without distributed transactions.
+
+### 2. State Machine
+Prevents invalid pledge state transitions with proper validation.
+
+### 3. Idempotency
+Protects against duplicate payments via Redis-backed idempotency keys.
+
+### 4. CQRS
+Campaign service separates reads (Redis cache) from writes (PostgreSQL).
+
+### 5. Event-Driven Architecture
+Services communicate via NATS for loose coupling.
+
+### 6. Observability
+Full tracing, metrics, and logging infrastructure.
+
+## 🔒 Security Considerations
+
+- JWT-based authentication (Auth service)
+- Idempotency keys prevent duplicate charges
+- State machine prevents backward transitions
+- Environment variables for secrets (see .env.example)
+
+## 📈 Scalability
+
+Scale services independently:
+```bash
+docker-compose up -d --scale pledge=3 --scale campaign=2
+```
+
+Features supporting high load:
+- Redis caching for read-heavy operations
+- Outbox pattern with concurrent workers
+- NATS for async communication
+- Database connection pooling
+
+## 👥 Team
+
+Built for the API Avengers Microservices Hackathon.
+
+## 📝 License
+
+MIT

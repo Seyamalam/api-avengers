@@ -1,0 +1,375 @@
+{
+  "title": "CareForAll - Microservices Overview",
+  "tags": [
+    "careforall",
+    "microservices"
+  ],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Service Health Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"gateway\"}",
+          "legendFormat": "Gateway",
+          "refId": "A"
+        },
+        {
+          "expr": "up{job=\"auth\"}",
+          "legendFormat": "Auth",
+          "refId": "B"
+        },
+        {
+          "expr": "up{job=\"campaign\"}",
+          "legendFormat": "Campaign",
+          "refId": "C"
+        },
+        {
+          "expr": "up{job=\"pledge\"}",
+          "legendFormat": "Pledge",
+          "refId": "D"
+        },
+        {
+          "expr": "up{job=\"payment\"}",
+          "legendFormat": "Payment",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "value": 1,
+              "text": "UP",
+              "color": "green"
+            },
+            {
+              "value": 0,
+              "text": "DOWN",
+              "color": "red"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Total Campaigns",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "campaign_service_up",
+          "legendFormat": "Active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "blue"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Total Pledges",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "pledge_service_up",
+          "legendFormat": "Created",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "blue"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Authentication Service",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "auth_service_up",
+          "legendFormat": "Status",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [
+            {
+              "value": 1,
+              "text": "ACTIVE",
+              "color": "green"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 1,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Gateway",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "gateway_service_up",
+          "legendFormat": "API Gateway",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [
+            {
+              "value": 1,
+              "text": "RUNNING",
+              "color": "green"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 1,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Request Rate (Gateway)",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{service=\"gateway\"}[5m])",
+          "legendFormat": "{{method}} {{path}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Requests/sec",
+          "format": "reqps"
+        }
+      ]
+    },
+    {
+      "title": "Response Time (Gateway)",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"gateway\"}[5m]))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{service=\"gateway\"}[5m]))",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Duration",
+          "format": "s"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+          "legendFormat": "{{service}} - {{method}} {{path}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Errors/sec",
+          "format": "reqps"
+        }
+      ],
+      "alert": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                0.01
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "A",
+                "5m",
+                "now"
+              ]
+            },
+            "reducer": {
+              "type": "avg"
+            },
+            "type": "query"
+          }
+        ],
+        "frequency": "60s",
+        "name": "High Error Rate Alert"
+      }
+    },
+    {
+      "title": "NATS Event Processing",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "targets": [
+        {
+          "expr": "rate(nats_messages_published_total[5m])",
+          "legendFormat": "{{event_type}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Events/sec",
+          "format": "ops"
+        }
+      ]
+    },
+    {
+      "title": "Database Connections",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_database_numbackends{datname=\"careforall\"}",
+          "legendFormat": "Active Connections",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Connections",
+          "format": "short"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 27,
+  "version": 1,
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  }
+}

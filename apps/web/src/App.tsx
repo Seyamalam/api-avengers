@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import AdminPanel from './AdminPanel'
 
 interface Campaign {
   id: number;
@@ -12,9 +13,25 @@ interface Campaign {
 function App() {
   const queryClient = useQueryClient()
   const [amount, setAmount] = useState(10)
+  const [showAdmin, setShowAdmin] = useState(false)
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAmount(Number(e.target.value))
+  if (showAdmin) {
+    return (
+      <div>
+        <div className="bg-blue-600 text-white p-4">
+          <div className="container mx-auto flex justify-between items-center">
+            <h1 className="text-2xl font-bold">CareForAll</h1>
+            <button 
+              onClick={() => setShowAdmin(false)}
+              className="bg-white text-blue-600 px-4 py-2 rounded hover:bg-gray-100"
+            >
+              Back to Public Site
+            </button>
+          </div>
+        </div>
+        <AdminPanel />
+      </div>
+    )
   }
 
   const { data: campaigns, isLoading } = useQuery<Campaign>({
@@ -46,7 +63,15 @@ function App() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">CareForAll</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">CareForAll</h1>
+        <button 
+          onClick={() => setShowAdmin(true)}
+          className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900"
+        >
+          Admin Panel
+        </button>
+      </div>
       
       <div className="border p-4 rounded shadow">
         <h2 className="text-xl font-bold">{campaigns?.title || 'Campaign Title'}</h2>
@@ -60,7 +85,7 @@ function App() {
           <input 
             type="number" 
             value={amount} 
-            onChange={handleAmountChange}
+            onChange={(e) => setAmount(Number(e.currentTarget.value))}
             className="border p-2 rounded"
           />
           <button 

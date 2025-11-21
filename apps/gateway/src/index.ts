@@ -1,10 +1,32 @@
 import { Hono } from 'hono';
-import { logger } from '@careforall/common';
+import { cors } from 'hono/cors';
+import { logger, jwtAuth, requireRole, validateEnv, validateJWTSecret } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
+
+// Validate environment variables
+validateEnv({
+  required: ['JWT_SECRET'],
+  optional: [
+    'AUTH_SERVICE_URL',
+    'CAMPAIGN_SERVICE_URL',
+    'PLEDGE_SERVICE_URL',
+    'PAYMENT_SERVICE_URL',
+    'OTEL_EXPORTER_OTLP_ENDPOINT',
+  ],
+});
+validateJWTSecret();
 
 initTelemetry('gateway-service');
 
 const app = new Hono();
+
+// CORS middleware
+app.use('*', cors({
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-idempotency-key'],
+  credentials: true,
+}));
 
 const SERVICES = {
   auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
@@ -19,10 +41,6 @@ app.use('*', async (c, next) => {
 });
 
 const proxy = (serviceUrl: string) => async (c: any) => {
-  const path = c.req.path.replace(/^\/api\/v1\/[^\/]+/, ''); // Strip prefix if needed, or just forward
-  // Actually, let's just forward the path relative to the service root.
-  // If request is /auth/login, we want to hit AUTH_SERVICE/auth/login.
-  
   const url = `${serviceUrl}${c.req.path}`;
   const method = c.req.method;
   const headers = c.req.header();
@@ -43,10 +61,28 @@ const proxy = (serviceUrl: string) => async (c: any) => {
   }
 };
 
-app.all('/auth/*', proxy(SERVICES.auth));
-app.all('/campaigns/*', proxy(SERVICES.campaign));
-app.all('/pledges/*', proxy(SERVICES.pledge));
-app.all('/payments/*', proxy(SERVICES.payment));
+// Public routes (no auth required)
+app.post('/auth/register', proxy(SERVICES.auth));
+app.post('/auth/login', proxy(SERVICES.auth));
+
+// Public campaign viewing
+app.get('/campaigns', proxy(SERVICES.campaign));
+app.get('/campaigns/:id', proxy(SERVICES.campaign));
+
+// Admin-only campaign management (POST, PUT, DELETE)
+app.post('/campaigns', jwtAuth(), requireRole('admin'), proxy(SERVICES.campaign));
+app.put('/campaigns/:id', jwtAuth(), requireRole('admin'), proxy(SERVICES.campaign));
+app.delete('/campaigns/:id', jwtAuth(), requireRole('admin'), proxy(SERVICES.campaign));
+
+// Protected routes - Require authentication
+app.post('/pledges', jwtAuth(), proxy(SERVICES.pledge));
+app.get('/pledges/:id', jwtAuth(), proxy(SERVICES.pledge));
+
+// Payment webhooks - no auth (validated by idempotency)
+app.post('/payments/webhook', proxy(SERVICES.payment));
+
+// Payment processing - requires auth
+app.post('/payments/process', jwtAuth(), proxy(SERVICES.payment));
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 

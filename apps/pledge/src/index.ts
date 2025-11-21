@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
-import { logger, idempotency } from '@careforall/common';
+import { logger, idempotency, performHealthCheck, validateEnv } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { pledgeRoutes } from './routes/pledges';
 import { startConsumers } from './consumers';
+
+// Validate environment variables
+validateEnv({
+  required: ['DATABASE_URL', 'REDIS_URL', 'NATS_URL'],
+  optional: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+});
 
 initTelemetry('pledge-service');
 
@@ -23,7 +29,9 @@ app.use('/pledges/*', idempotency());
 
 app.route('/pledges', pledgeRoutes);
 
-app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/health', async (c) => {
+  return c.json({ status: 'ok', service: 'pledge' });
+});
 
 app.get('/metrics', (c) => {
   return c.text(`# HELP pledge_service_up Pledge service is running

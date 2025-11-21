@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
-import { logger } from '@careforall/common';
+import { logger, performHealthCheck, validateEnv } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { natsClient } from '@careforall/events';
 import { paymentRoutes } from './routes/payment';
+
+// Validate environment variables
+validateEnv({
+  required: ['REDIS_URL', 'NATS_URL'],
+  optional: ['OTEL_EXPORTER_OTLP_ENDPOINT'],
+});
 
 initTelemetry('payment-service');
 
@@ -19,7 +25,9 @@ app.use('*', async (c, next) => {
 
 app.route('/payments', paymentRoutes);
 
-app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/health', async (c) => {
+  return c.json({ status: 'ok', service: 'payment' });
+});
 
 app.get('/metrics', (c) => {
   return c.text(`# HELP payment_service_up Payment service is running

@@ -11,24 +11,23 @@ async function processOutbox() {
     try {
       await db.transaction(async (tx) => {
         // 1. Fetch unprocessed events with row locking for concurrency
-        // Using raw SQL for FOR UPDATE SKIP LOCKED support
-        const events = await tx.execute(sql`
-          SELECT * FROM ${outbox}
-          WHERE ${outbox.processedAt} IS NULL
-          ORDER BY ${outbox.createdAt} ASC
-          LIMIT 10
-          FOR UPDATE SKIP LOCKED
-        `);
+        const events = await tx
+          .select()
+          .from(outbox)
+          .where(isNull(outbox.processedAt))
+          .orderBy(outbox.createdAt)
+          .limit(10)
+          .for('update', { skipLocked: true });
 
-        for (const event of events.rows) {
-          // 2. Publish to NATS
-          await natsClient.publish(event.event_type as string, event.payload);
-          logger.info(`Published event: ${event.event_type} (${event.aggregate_id})`);
+        for (const event of events) {
+          // 2. Publish to NATS - payload is already an object from Drizzle
+          await natsClient.publish(event.eventType, event.payload);
+          logger.info(`Published event: ${event.eventType} (${event.aggregateId})`);
 
           // 3. Mark as processed
           await tx.update(outbox)
             .set({ processedAt: new Date() })
-            .where(eq(outbox.id, event.id as number));
+            .where(eq(outbox.id, event.id));
         }
       });
     } catch (error) {

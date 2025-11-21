@@ -1,0 +1,354 @@
+{
+  "title": "CareForAll - System Performance",
+  "tags": [
+    "careforall",
+    "performance",
+    "infrastructure"
+  ],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Service Health Overview",
+      "type": "stat",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"gateway\"}",
+          "legendFormat": "Gateway",
+          "refId": "A"
+        },
+        {
+          "expr": "up{job=\"auth\"}",
+          "legendFormat": "Auth",
+          "refId": "B"
+        },
+        {
+          "expr": "up{job=\"campaign\"}",
+          "legendFormat": "Campaign",
+          "refId": "C"
+        },
+        {
+          "expr": "up{job=\"pledge\"}",
+          "legendFormat": "Pledge",
+          "refId": "D"
+        },
+        {
+          "expr": "up{job=\"payment\"}",
+          "legendFormat": "Payment",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "value": 1,
+              "text": "UP",
+              "color": "green"
+            },
+            {
+              "value": 0,
+              "text": "DOWN",
+              "color": "red"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "title": "Gateway Request Rate",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{service=\"gateway\"}[5m])) by (method)",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Requests/sec",
+          "format": "reqps"
+        }
+      ],
+      "legend": {
+        "show": true,
+        "alignAsTable": true,
+        "avg": true,
+        "max": true,
+        "current": true
+      }
+    },
+    {
+      "title": "Gateway Response Time Distribution",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{service=\"gateway\"}[5m]))",
+          "legendFormat": "p99",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"gateway\"}[5m]))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{service=\"gateway\"}[5m]))",
+          "legendFormat": "p50 (median)",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Response Time",
+          "format": "s"
+        }
+      ]
+    },
+    {
+      "title": "Database Connection Pool",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 14
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_database_numbackends{datname=\"careforall\"}",
+          "legendFormat": "Active Connections",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Connections",
+          "format": "short"
+        }
+      ],
+      "alert": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                50
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "A",
+                "5m",
+                "now"
+              ]
+            },
+            "reducer": {
+              "type": "avg"
+            },
+            "type": "query"
+          }
+        ],
+        "frequency": "60s",
+        "name": "High Database Connections"
+      }
+    },
+    {
+      "title": "Redis Cache Hit Rate",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 14
+      },
+      "targets": [
+        {
+          "expr": "rate(redis_hits_total[5m]) / (rate(redis_hits_total[5m]) + rate(redis_misses_total[5m])) * 100",
+          "legendFormat": "Hit Rate %",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Hit Rate",
+          "format": "percent",
+          "min": 0,
+          "max": 100
+        }
+      ]
+    },
+    {
+      "title": "Redis Operations/sec",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
+      "targets": [
+        {
+          "expr": "rate(redis_commands_total[5m])",
+          "legendFormat": "{{command}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Ops/sec",
+          "format": "ops"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate by Service",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (service)",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Errors/sec",
+          "format": "reqps"
+        }
+      ],
+      "thresholds": [
+        {
+          "value": 0.01,
+          "colorMode": "critical",
+          "fill": true,
+          "line": true
+        }
+      ]
+    },
+    {
+      "title": "API Gateway Status Codes",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_requests_total{service=\"gateway\"}[5m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        }
+      }
+    },
+    {
+      "title": "Memory Usage by Service",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "Memory",
+          "format": "bytes"
+        }
+      ]
+    },
+    {
+      "title": "CPU Usage by Service",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        {
+          "label": "CPU %",
+          "format": "percent"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 27,
+  "version": 1,
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  }
+}

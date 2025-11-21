@@ -1,0 +1,76 @@
+[0;34m========================================[0m
+[0;34m🧪 CareForAll Comprehensive Test Suite[0m
+[0;34m========================================[0m
+
+[1;33m⏳ Waiting for services to start up...[0m
+
+[0;34m📋 SECTION 1: Health Checks[0m
+[0;34m========================================[0m
+Testing Gateway health... [0;32m✓ Healthy[0m
+[1;39m{
+  [0m[1;34m"status"[0m[1;39m: [0m[0;32m"ok"[0m[1;39m
+[1;39m}[0m
+
+Testing Auth Service health... [0;32m✓ Healthy[0m
+[1;39m{
+  [0m[1;34m"status"[0m[1;39m: [0m[0;32m"ok"[0m[1;39m,
+  [0m[1;34m"service"[0m[1;39m: [0m[0;32m"auth"[0m[1;39m
+[1;39m}[0m
+
+Testing Campaign Service health... [0;32m✓ Healthy[0m
+[1;39m{
+  [0m[1;34m"status"[0m[1;39m: [0m[0;32m"ok"[0m[1;39m,
+  [0m[1;34m"service"[0m[1;39m: [0m[0;32m"campaign"[0m[1;39m
+[1;39m}[0m
+
+Testing Pledge Service health... [0;32m✓ Healthy[0m
+[1;39m{
+  [0m[1;34m"status"[0m[1;39m: [0m[0;32m"ok"[0m[1;39m,
+  [0m[1;34m"service"[0m[1;39m: [0m[0;32m"pledge"[0m[1;39m
+[1;39m}[0m
+
+Testing Payment Service health... [0;32m✓ Healthy[0m
+[1;39m{
+  [0m[1;34m"status"[0m[1;39m: [0m[0;32m"ok"[0m[1;39m,
+  [0m[1;34m"service"[0m[1;39m: [0m[0;32m"payment"[0m[1;39m
+[1;39m}[0m
+
+
+[0;34m🔐 SECTION 2: Authentication & Authorization[0m
+[0;34m========================================[0m
+[1;33mTest 2.1: Register User[0m
+[0;31m✗ User registration failed[0m
+[1;39m{
+  [0m[1;34m"error"[0m[1;39m: [0m[0;32m"User already exists"[0m[1;39m
+[1;39m}[0m
+
+[1;33mTest 2.2: Register Admin[0m
+[0;31m✗ Admin registration failed[0m
+[1;39m{
+  [0m[1;34m"error"[0m[1;39m: [0m[0;32m"User already exists"[0m[1;39m
+[1;39m}[0m
+
+[1;33mTest 2.3: Login[0m
+[0;32m✓ Login successful[0m
+[1;39m{
+  [0m[1;34m"token"[0m[1;39m: [0m[0;32m"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6InVzZXIiLCJpYXQiOjE3NjM3MDI5ODAsImV4cCI6MTc2Mzc4OTM4MH0.HhPjR70517OnrMM6T7kuY-5r2u8kgdBMYw70uEY65ok"[0m[1;39m
+[1;39m}[0m
+
+[1;33mTest 2.4: Protected Endpoint (No Token)[0m
+[0;32m✓ Correctly rejected unauthorized request[0m
+
+
+[0;34m🎯 SECTION 3: Campaign Management[0m
+[0;34m========================================[0m
+[1;33mTest 3.1: Create Campaign (Admin)[0m
+[0;31m✗ Campaign creation failed[0m
+[1;39m{
+  [0m[1;34m"error"[0m[1;39m: [0m[0;32m"Invalid token"[0m[1;39m
+[1;39m}[0m
+
+[1;33mTest 3.2: Create Campaign (Regular User - Should Fail)[0m
+[0;31m✗ Should have denied access (got HTTP 401)[0m
+
+[1;33mTest 3.3: Get Campaign (Public Access)[0m
+[0;32m✓ Campaign retrieved[0m
+jq: parse error: Invalid numeric literal at line 1, column 9

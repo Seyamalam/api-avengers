@@ -11,6 +11,7 @@ const app = new Hono();
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
+  role: z.enum(['user', 'admin']).default('user'),
 });
 
 const loginSchema = z.object({
@@ -22,7 +23,7 @@ app.post(
   '/register',
   zValidator('json', registerSchema),
   async (c) => {
-    const { email, password } = c.req.valid('json');
+    const { email, password, role } = c.req.valid('json');
   
     const existingUser = await db.query.users.findFirst({
       where: eq(users.email, email),
@@ -37,13 +38,25 @@ app.post(
   const [user] = await db.insert(users).values({
     email,
     password: hashedPassword,
+    role,
   }).returning();
 
   if (!user) {
     return c.json({ error: 'Failed to create user' }, 500);
   }
 
-    return c.json({ id: user.id, email: user.email }, 201);
+  const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'secret', {
+    expiresIn: '7d',
+  });
+
+    return c.json({ 
+      token,
+      user: { 
+        id: user.id, 
+        email: user.email,
+        role: user.role
+      } 
+    }, 201);
   }
 );
 

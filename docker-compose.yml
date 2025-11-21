@@ -11,6 +11,7 @@ services:
       POSTGRES_DB: careforall
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-admin.sh:/docker-entrypoint-initdb.d/init-admin.sh
     networks:
       - careforall-net
     healthcheck:
@@ -73,8 +74,13 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
     networks:
       - careforall-net
     depends_on:
@@ -120,6 +126,7 @@ services:
       - CAMPAIGN_SERVICE_URL=http://campaign:3002
       - PLEDGE_SERVICE_URL=http://pledge:3003
       - PAYMENT_SERVICE_URL=http://payment:3004
+      - JWT_SECRET=hackathon-demo-secret-key-change-in-production-environment
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       - auth
@@ -136,6 +143,7 @@ services:
       - "3001:3001"
     environment:
       - DATABASE_URL=postgres://user:password@postgres:5432/careforall
+      - JWT_SECRET=hackathon-demo-secret-key-change-in-production-environment
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     depends_on:
       postgres:
