@@ -44,4 +44,20 @@ app.post('/', zValidator('json', createPledgeSchema), async (c) => {
   }
 });
 
+app.get('/user/:userId', async (c) => {
+  const userId = parseInt(c.req.param('userId'));
+  
+  try {
+    const userPledges = await db.query.pledges.findMany({
+      where: (pledges, { eq }) => eq(pledges.userId, userId),
+      orderBy: (pledges, { desc }) => [desc(pledges.createdAt)],
+    });
+
+    return c.json(userPledges);
+  } catch (error) {
+    console.error(error);
+    return c.json({ error: 'Failed to fetch user pledges' }, 500);
+  }
+});
+
 export const pledgeRoutes = app;

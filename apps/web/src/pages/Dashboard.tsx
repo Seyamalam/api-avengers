@@ -27,6 +27,26 @@ export default function Dashboard() {
     }
   });
 
+  const { data: pledges } = useQuery({
+    queryKey: ['my-pledges'],
+    queryFn: async () => {
+      if (!token) return [];
+      // We need the user ID. The token might have it, or we can get it from context if available.
+      // Assuming the AuthContext provides the user object with an ID.
+      // Let's check AuthContext usage.
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return [];
+      const user = JSON.parse(userStr);
+      
+      const res = await fetch(`/api/pledges/user/${user.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!token
+  });
+
   const pledgeMutation = useMutation({
     mutationFn: async ({ campaignId, amount }: { campaignId: number, amount: number }) => {
       const res = await fetch('/api/pledges', {
@@ -138,6 +158,45 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {token && pledges && pledges.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">My Donation History</h2>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold text-gray-600">Date</th>
+                    <th className="px-6 py-4 font-semibold text-gray-600">Amount</th>
+                    <th className="px-6 py-4 font-semibold text-gray-600">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pledges.map((pledge: any) => (
+                    <tr key={pledge.id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 text-gray-500">
+                        {new Date(pledge.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-slate-900">
+                        ${pledge.amount.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                          ${pledge.status === 'CAPTURED' ? 'bg-green-100 text-green-700' : 
+                            pledge.status === 'FAILED' ? 'bg-red-100 text-red-700' : 
+                            'bg-yellow-100 text-yellow-700'}`}>
+                          {pledge.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

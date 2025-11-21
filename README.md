@@ -1,22 +1,39 @@
 # CareForAll - Microservices Hackathon Solution
 
-## ✅ Checkpoint 1: Architecture & Design Strategy
+## 🚀 Project Status: Checkpoints 1 & 2 Completed
 
-We have successfully mapped out the **CareForAll** ecosystem with a fault-tolerant, scalable microservices architecture.
+We have successfully designed, implemented, and verified the core architecture and functionality of the **CareForAll** platform.
 
-### 🏗️ Architecture Highlights
-- **Microservices Boundaries**: Distinct services for Auth, Campaign, Pledge, Payment, and Banking, ensuring separation of concerns.
-- **Fault Tolerance**: Implemented **Idempotency** (Redis), **Outbox Pattern** (Reliable Events), and **Circuit Breakers**.
+### ✅ Checkpoint 1: Architecture & Design
+- **Microservices Architecture**: Decomposed into **Auth, Campaign, Pledge, Payment, Bank, Gateway, Notification, and Chat** services.
+- **Fault Tolerance**:
+  - **Idempotency**: Implemented in the Payment service using Redis to prevent duplicate charges from webhook retries.
+  - **Outbox Pattern**: Implemented in the Pledge service to ensure atomic database writes and event publishing.
 - **Scalability Strategy**:
-  - **Horizontal Scaling**: Our stateless services (Campaign, Pledge) are designed to be scaled horizontally.
-  - **Database Replication**: We use a **Read Replica** (`postgres-replica`) to offload read traffic from the main database.
-  - **Cache Replication**: We use a **Redis Replica** (`redis-replica`) for high-availability caching.
-  - **Demonstration**: You can scale any service using Docker Compose:
-    ```bash
-    docker compose up -d --scale campaign=3 --scale pledge=2
-    ```
-- **Data Models**: Defined using **Drizzle ORM** in `packages/db`, ensuring type safety and clear schema definitions.
-- **Diagram**: See the [Architecture Overview](#architecture-overview) below for a visual representation.
+  - **Horizontal Scaling**: Services are stateless and containerized. We demonstrated this by configuring the **Pledge Service** with `replicas: 2` in `docker-compose.yml`.
+  - **Database Replication**: Read replicas configured for PostgreSQL to handle high read traffic.
+- **Data Models**: robust schemas defined using **Drizzle ORM** in `packages/db`.
+
+### ✅ Checkpoint 2: Core Implementation
+- **Full Backend Implementation**: All core services are fully functional with inter-service communication via **NATS** and HTTP.
+- **Frontend Application**: A React-based web app featuring:
+  - **Admin Dashboard**: Full campaign management (Create, Update, Delete).
+  - **User Dashboard**: Transparent donation history and real-time campaign updates.
+  - **Real-time Chat**: Bonus feature implemented for user support.
+- **Payment Reliability**:
+  - **Idempotency**: Verified with unit tests (`apps/payment/test/idempotency.test.ts`).
+  - **Transaction Safety**: Bank service uses database transactions for atomic balance updates.
+- **Testing**: Unit tests implemented for **Campaign, Pledge, Payment, and Bank** services.
+- **Bonus Features**:
+  - **Real-time Chat**: Implemented using WebSockets.
+  - **Notifications**: Event-driven notification system.
+
+### ✅ Checkpoint 4: CI/CD Pipeline
+- **GitHub Actions Workflow**: A comprehensive pipeline defined in `.github/workflows/ci-cd.yml`.
+- **Intelligent Change Detection**: Uses `dorny/paths-filter` to run tests and builds **only for modified services**, optimizing CI time.
+- **Semantic Versioning**: Automatically reads the version from each service's `package.json` (e.g., `v1.0.2`) to tag Docker images.
+- **Docker Registry**: Builds and pushes images to **GitHub Container Registry (GHCR)** with semantic tags and `latest`.
+- **Bonus: Automated Deployment**: The pipeline includes a `deploy-bonus` job that spins up the entire system using `docker compose up` to verify end-to-end deployment readiness.
 
 ---
 

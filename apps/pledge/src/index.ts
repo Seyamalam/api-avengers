@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
-import { logger, idempotency, performHealthCheck, validateEnv, register, httpRequestCounter, httpRequestDuration } from '@careforall/common';
+import { logger, idempotency, performHealthCheck, validateEnv, register, httpRequestCounter, httpRequestDuration, outboxQueueDepth } from '@careforall/common';
 import { initTelemetry } from '@careforall/telemetry';
 import { pledgeRoutes } from './routes/pledges';
 import { startConsumers } from './consumers';
+import { db, outbox } from '@careforall/db';
+import { isNull, count } from 'drizzle-orm';
 
 // Validate environment variables
 validateEnv({
@@ -11,6 +13,19 @@ validateEnv({
 });
 
 initTelemetry('pledge-service');
+
+// Update outbox metrics periodically
+setInterval(async () => {
+  try {
+    const [result] = await db.select({ count: count() })
+      .from(outbox)
+      .where(isNull(outbox.processedAt));
+    
+    outboxQueueDepth.set(result.count);
+  } catch (error) {
+    logger.error('Failed to update outbox metrics', error);
+  }
+}, 5000);
 
 const app = new Hono();
 

@@ -14,4 +14,11 @@ scrape_configs:
         - 'campaign:3002'
         - 'pledge:3003'
         - 'payment:3004'
+        - 'bank:3005'
+        - 'notification:3006'
+        - 'chat:3007'
     metrics_path: '/metrics'
+
+  - job_name: 'nats'
+    static_configs:
+      - targets: ['nats-exporter:7777']

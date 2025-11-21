@@ -191,6 +191,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      - SERVICE_NAME=gateway
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - AUTH_SERVICE_URL=http://auth:3001
       - CAMPAIGN_SERVICE_URL=http://campaign:3002
       - PLEDGE_SERVICE_URL=http://pledge:3003
@@ -220,6 +222,8 @@ services:
     ports:
       - "3001:3001"
     environment:
+      - SERVICE_NAME=auth
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - JWT_SECRET=${JWT_SECRET}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
@@ -235,6 +239,8 @@ services:
     ports:
       - "3002:3002"
     environment:
+      - SERVICE_NAME=campaign
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - NATS_URL=nats://nats:4222
@@ -253,8 +259,12 @@ services:
     build: .
     command: ["bun", "run", "apps/pledge/src/index.ts"]
     ports:
-      - "3003:3003"
+      - "3100-3105:3003" # Allow range of ports for replicas
+    deploy:
+      replicas: 2
     environment:
+      - SERVICE_NAME=pledge
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - NATS_URL=nats://nats:4222
@@ -271,6 +281,8 @@ services:
     build: .
     command: ["bun", "run", "apps/pledge/src/worker.ts"]
     environment:
+      - SERVICE_NAME=pledge-worker
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - NATS_URL=nats://nats:4222
     depends_on:
@@ -287,6 +299,8 @@ services:
     ports:
       - "3004:3004"
     environment:
+      - SERVICE_NAME=payment
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - REDIS_URL=redis://redis:6379
       - NATS_URL=nats://nats:4222
       - BANK_SERVICE_URL=http://bank:3005
@@ -308,6 +322,8 @@ services:
     ports:
       - "3005:3005"
     environment:
+      - SERVICE_NAME=bank
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-bank:5432/bank
       - PORT=3005
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
@@ -323,6 +339,8 @@ services:
     ports:
       - "3006:3006"
     environment:
+      - SERVICE_NAME=notification
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - NATS_URL=nats://nats:4222
       - PORT=3006
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
@@ -338,6 +356,8 @@ services:
     ports:
       - "3007:3007"
     environment:
+      - SERVICE_NAME=chat
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - PORT=3007
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
     networks:
@@ -353,6 +373,17 @@ services:
       - VITE_API_TARGET=http://gateway:8080
     networks:
       - careforall-net
+
+  nats-exporter:
+    image: natsio/prometheus-nats-exporter:0.14.0
+    command: -varz -connz -routez -subz -http_port 7777 http://nats:8222
+    ports:
+      - "7777:7777"
+    networks:
+      - careforall-net
+    depends_on:
+      nats:
+        condition: service_healthy
 
 networks:
   careforall-net:

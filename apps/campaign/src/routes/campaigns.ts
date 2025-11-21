@@ -90,4 +90,54 @@ app.get('/:id', async (c) => {
   return c.json(campaign);
 });
 
+const updateCampaignSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  goalAmount: z.number().positive().optional(),
+  isActive: z.boolean().optional(),
+});
+
+app.put(
+  '/:id',
+  zValidator('json', updateCampaignSchema),
+  async (c) => {
+    const id = parseInt(c.req.param('id'));
+    const data = c.req.valid('json');
+
+    const [updated] = await db.update(campaigns)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(campaigns.id, id))
+      .returning();
+
+    if (!updated) {
+      return c.json({ error: 'Campaign not found' }, 404);
+    }
+
+    // Invalidate cache
+    await redis.del(`campaign:${id}`);
+    // We might want to invalidate the list cache too, but it's short lived (5 mins)
+    // For now let's just invalidate the specific item
+
+    return c.json(updated);
+  }
+);
+
+app.delete('/:id', async (c) => {
+  const id = parseInt(c.req.param('id'));
+
+  const [updated] = await db.update(campaigns)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(campaigns.id, id))
+    .returning();
+
+  if (!updated) {
+    return c.json({ error: 'Campaign not found' }, 404);
+  }
+
+  // Invalidate cache
+  await redis.del(`campaign:${id}`);
+
+  return c.json({ success: true, message: 'Campaign deactivated' });
+});
+
 export const campaignRoutes = app;

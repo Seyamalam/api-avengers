@@ -8,7 +8,7 @@ set -e
 GATEWAY_URL="http://localhost:8080"
 AUTH_URL="http://localhost:3001"
 CAMPAIGN_URL="http://localhost:3002"
-PLEDGE_URL="http://localhost:3003"
+PLEDGE_URL="http://localhost:3100"
 PAYMENT_URL="http://localhost:3004"
 BANK_URL="http://localhost:3005"
 NOTIFICATION_URL="http://localhost:3006"
@@ -286,7 +286,7 @@ AUTHORIZE_RESPONSE=$(curl -s -X POST "$GATEWAY_URL/payments/authorize" \
   -d "{
     \"pledgeId\": $PLEDGE_ID,
     \"amount\": 1500,
-    \"accountNumber\": \"ACC001\"
+    \"accountNumber\": \"ACC030\"
   }")
 
 HOLD_ID=$(echo "$AUTHORIZE_RESPONSE" | jq -r '.holdId')
@@ -555,7 +555,7 @@ echo ""
 
 echo -e "${BLUE}🔗 Service URLs:${NC}"
 echo "  • Gateway: $GATEWAY_URL"
-echo "  • Frontend: http://localhost:3005"
+echo "  • Frontend: http://localhost:5173"
 echo "  • Jaeger: http://localhost:16686"
 echo "  • Prometheus: http://localhost:9090"
 echo "  • Grafana: http://localhost:3000"
@@ -566,5 +566,5 @@ echo -e "${BLUE}🎯 Next Steps:${NC}"
 echo "  1. View traces in Jaeger"
 echo "  2. Create dashboards in Grafana"
 echo "  3. Search logs in Kibana"
-echo "  4. Test frontend at http://localhost:3005"
+echo "  4. Test frontend at http://localhost:5173"
 echo ""

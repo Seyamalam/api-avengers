@@ -53,9 +53,32 @@ export default function AdminDashboard() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/campaigns/${id}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
+      alert('Campaign deactivated successfully!');
+    }
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createMutation.mutate(formData);
+  };
+
+  const handleDelete = (id: number) => {
+    if (confirm('Are you sure you want to deactivate this campaign?')) {
+      deleteMutation.mutate(id);
+    }
   };
 
   return (
@@ -151,7 +174,10 @@ export default function AdminDashboard() {
                       <button className="p-1 text-blue-600 hover:bg-blue-50 rounded">
                         <Edit2 size={16} />
                       </button>
-                      <button className="p-1 text-red-600 hover:bg-red-50 rounded">
+                      <button 
+                        onClick={() => handleDelete(campaign.id)} 
+                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                      >
                         <Trash2 size={16} />
                       </button>
                     </div>

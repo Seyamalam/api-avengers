@@ -64,7 +64,7 @@
       },
       "targets": [
         {
-          "expr": "outbox_pending_events",
+          "expr": "outbox_queue_depth",
           "legendFormat": "Pending",
           "refId": "A"
         }

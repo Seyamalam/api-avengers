@@ -6,7 +6,7 @@ export function initTelemetry(serviceName: string) {
   const sdk = new NodeSDK({
     serviceName,
     traceExporter: new OTLPTraceExporter({
-      url: 'http://localhost:4318/v1/traces',
+      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     instrumentations: [getNodeAutoInstrumentations()],
   });
