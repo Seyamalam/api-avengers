@@ -21,6 +21,7 @@ jobs:
       gateway: ${{ steps.filter.outputs.gateway }}
       web: ${{ steps.filter.outputs.web }}
       packages: ${{ steps.filter.outputs.packages }}
+      services: ${{ steps.set-matrix.outputs.services }}
     steps:
       - uses: actions/checkout@v4
       
@@ -57,6 +58,14 @@ jobs:
             packages:
               - 'packages/**'
 
+      - name: Set Matrix
+        id: set-matrix
+        run: |
+          ALL_SERVICES='["auth", "campaign", "pledge", "payment", "bank", "notification", "chat", "gateway"]'
+          CHANGES='${{ steps.filter.outputs.changes }}'
+          SERVICES=$(echo "$CHANGES" | jq -c --argjson all "$ALL_SERVICES" 'map(select(. as $x | $all | index($x)))')
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+
   test-packages:
     name: Test Shared Packages
     runs-on: ubuntu-latest
@@ -79,10 +88,10 @@ jobs:
     name: Test Services
     runs-on: ubuntu-latest
     needs: detect-changes
+    if: needs.detect-changes.outputs.services != '[]'
     strategy:
       matrix:
-        service: [auth, campaign, pledge, payment, bank, notification, chat, gateway]
-    if: needs.detect-changes.outputs[matrix.service] == 'true'
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
     steps:
       - uses: actions/checkout@v4
       

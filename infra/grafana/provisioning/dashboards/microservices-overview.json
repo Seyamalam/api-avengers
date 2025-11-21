@@ -17,27 +17,27 @@
       },
       "targets": [
         {
-          "expr": "up{job=\"gateway\"}",
+          "expr": "up{instance=\"gateway:8080\"}",
           "legendFormat": "Gateway",
           "refId": "A"
         },
         {
-          "expr": "up{job=\"auth\"}",
+          "expr": "up{instance=\"auth:3001\"}",
           "legendFormat": "Auth",
           "refId": "B"
         },
         {
-          "expr": "up{job=\"campaign\"}",
+          "expr": "up{instance=\"campaign:3002\"}",
           "legendFormat": "Campaign",
           "refId": "C"
         },
         {
-          "expr": "up{job=\"pledge\"}",
+          "expr": "up{instance=\"pledge:3003\"}",
           "legendFormat": "Pledge",
           "refId": "D"
         },
         {
-          "expr": "up{job=\"payment\"}",
+          "expr": "up{instance=\"payment:3004\"}",
           "legendFormat": "Payment",
           "refId": "E"
         }
@@ -83,7 +83,7 @@
       },
       "targets": [
         {
-          "expr": "campaign_service_up",
+          "expr": "campaigns_total",
           "legendFormat": "Active",
           "refId": "A"
         }
@@ -117,7 +117,7 @@
       },
       "targets": [
         {
-          "expr": "pledge_service_up",
+          "expr": "pledges_total",
           "legendFormat": "Created",
           "refId": "A"
         }
@@ -151,7 +151,7 @@
       },
       "targets": [
         {
-          "expr": "auth_service_up",
+          "expr": "up{instance=\"auth:3001\"}",
           "legendFormat": "Status",
           "refId": "A"
         }
@@ -189,7 +189,7 @@
       },
       "targets": [
         {
-          "expr": "gateway_service_up",
+          "expr": "up{instance=\"gateway:8080\"}",
           "legendFormat": "API Gateway",
           "refId": "A"
         }
