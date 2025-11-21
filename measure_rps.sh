@@ -16,12 +16,7 @@ echo "Building load test tool..."
 go build -o loadtest .
 
 echo "Running load test..."
-./loadtest &
-PID=$!
-
-sleep 60
-
-kill $PID
+./loadtest
 
 echo -e "\nTest completed."
 echo "Please check the final RPS number in the output above."

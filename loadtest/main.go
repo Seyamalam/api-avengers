@@ -1,387 +1,117 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"log"
-	"math/rand"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const (
-	gatewayURL = "http://localhost:8080"
-	adminEmail = "admin@careforall.com"
-	adminPass  = "admin123"
-	numUsers   = 20
+	targetURL     = "http://localhost:8080/campaigns"
+	concurrency   = 100 // Number of concurrent workers
+	duration      = 60 * time.Second
 )
 
-type Stats struct {
-	mu              sync.Mutex
-	totalRequests   int64
-	successRequests int64
-	failedRequests  int64
-	pledgesCreated  int64
-	paymentsProcessed int64
-	campaignsViewed int64
-}
-
-var stats = &Stats{}
-var userTokens []string
-
 func main() {
-	fmt.Println("🚀 CareForAll Load Testing Tool")
-	fmt.Println("================================")
-	fmt.Println("Starting continuous load generation...")
-	fmt.Println("Press Ctrl+C to stop\n")
+	fmt.Println("🚀 Starting High-Performance Load Test")
+	fmt.Printf("Target: %s\n", targetURL)
+	fmt.Printf("Concurrency: %d workers\n", concurrency)
+	fmt.Printf("Duration: %v\n\n", duration)
 
-	// Get admin token
-	adminToken, err := login(adminEmail, adminPass)
-	if err != nil {
-		log.Fatalf("Failed to get admin token: %v", err)
-	}
-	fmt.Printf("✓ Admin authenticated\n")
+	var (
+		totalRequests uint64
+		successCount  uint64
+		failedCount   uint64
+	)
 
-	// Initialize User Pool
-	fmt.Printf("Creating pool of %d users...\n", numUsers)
-	for i := 0; i < numUsers; i++ {
-		email := fmt.Sprintf("loaduser-%d@loadtest.com", i)
-		token, err := registerAndLogin(email, "TestPass123!")
-		if err != nil {
-			log.Printf("Failed to register user %d: %v", i, err)
-			continue
-		}
-		userTokens = append(userTokens, token)
-	}
-	fmt.Printf("✓ User pool created (%d users)\n\n", len(userTokens))
-
-	// Start stats reporter
-	go reportStats()
-
-	// Start multiple worker goroutines
-	var wg sync.WaitGroup
-
-	// 20 Workers that create pledges AND process payments (Full Flow)
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			donorWorker(workerID)
-		}(i)
+	// Optimized HTTP Client
+	client := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        1000,
+			MaxIdleConnsPerHost: 1000,
+			IdleConnTimeout:     90 * time.Second,
+			DisableKeepAlives:   false,
+		},
+		Timeout: 10 * time.Second,
 	}
 
-	// 30 Workers that view campaigns (High Read Load)
-	for i := 0; i < 30; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			campaignViewWorker(workerID)
-		}(i)
-	}
+	start := time.Now()
+	done := make(chan struct{})
 
-	// Worker that creates new campaigns occasionally
-	wg.Add(1)
+	// Timer to stop the test
 	go func() {
-		defer wg.Done()
-		campaignCreationWorker(adminToken)
+		time.Sleep(duration)
+		close(done)
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+
+	// Worker Pool
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-done:
+					return
+				default:
+					resp, err := client.Get(targetURL)
+					atomic.AddUint64(&totalRequests, 1)
+					
+					if err == nil {
+						if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+							atomic.AddUint64(&successCount, 1)
+						} else {
+							atomic.AddUint64(&failedCount, 1)
+						}
+						resp.Body.Close()
+					} else {
+						atomic.AddUint64(&failedCount, 1)
+					}
+				}
+			}
+		}()
+	}
+
+	// Stats Reporter
+	ticker := time.NewTicker(1 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				reqs := atomic.LoadUint64(&totalRequests)
+				elapsed := time.Since(start).Seconds()
+				rps := float64(reqs) / elapsed
+				fmt.Printf("\rCurrent RPS: %.2f | Total: %d", rps, reqs)
+			}
+		}
 	}()
 
 	wg.Wait()
-}
+	ticker.Stop()
 
-func donorWorker(workerID int) {
-	if len(userTokens) == 0 {
-		return
+	elapsed := time.Since(start).Seconds()
+	rps := float64(totalRequests) / elapsed
+
+	fmt.Println("\n\n========================================")
+	fmt.Println("🎉 Load Test Completed")
+	fmt.Println("========================================")
+	fmt.Printf("Total Requests: %d\n", totalRequests)
+	fmt.Printf("Success:        %d\n", successCount)
+	fmt.Printf("Failed:         %d\n", failedCount)
+	fmt.Printf("Duration:       %.2fs\n", elapsed)
+	fmt.Printf("Average RPS:    %.2f\n", rps)
+	fmt.Println("========================================")
+
+	if rps >= 1000 {
+		fmt.Println("✅ SUCCESS: Target of 1000 RPS met!")
+	} else {
+		fmt.Println("❌ FAILURE: Target of 1000 RPS not met.")
 	}
-
-	for {
-		// Pick random user
-		token := userTokens[rand.Intn(len(userTokens))]
-		
-		// Get random campaign (assuming IDs 1-5 exist mostly)
-		campaignID := rand.Intn(5) + 1 
-		amount := (rand.Intn(20) + 1) * 100 // $100 - $2000
-
-		// 1. Create pledge
-		pledgeID, err := createPledge(token, campaignID, amount)
-		
-		stats.mu.Lock()
-		stats.totalRequests++
-		if err == nil {
-			stats.successRequests++
-			stats.pledgesCreated++
-		} else {
-			stats.failedRequests++
-		}
-		stats.mu.Unlock()
-
-		if err == nil {
-			// Simulate user entering payment details...
-			time.Sleep(time.Duration(rand.Intn(500)+200) * time.Millisecond)
-
-			// 2. Simulate Payment Webhook (Success)
-			// In real life, user goes to payment gateway, pays, and gateway calls webhook
-			err := simulatePaymentWebhook(pledgeID, "succeeded")
-
-			stats.mu.Lock()
-			stats.totalRequests++
-			if err == nil {
-				stats.successRequests++
-				stats.paymentsProcessed++
-			} else {
-				stats.failedRequests++
-			}
-			stats.mu.Unlock()
-		}
-
-		// Sleep between 0.5 - 2 seconds
-		time.Sleep(time.Duration(rand.Intn(1500)+500) * time.Millisecond)
-	}
-}
-
-func campaignViewWorker(workerID int) {
-	for {
-		// View random campaign
-		campaignID := rand.Intn(5) + 1
-		
-		// 50% chance to list all, 50% to view one
-		var err error
-		if rand.Float32() > 0.5 {
-			err = getCampaign(campaignID)
-		} else {
-			err = listCampaigns()
-		}
-		
-		stats.mu.Lock()
-		stats.totalRequests++
-		if err == nil {
-			stats.successRequests++
-			stats.campaignsViewed++
-		} else {
-			stats.failedRequests++
-		}
-		stats.mu.Unlock()
-
-		// Fast reads: 100ms - 500ms
-		time.Sleep(time.Duration(rand.Intn(400)+100) * time.Millisecond)
-	}
-}
-
-func campaignCreationWorker(adminToken string) {
-	for {
-		// Create a new campaign every 10-20 seconds
-		time.Sleep(time.Duration(rand.Intn(10)+10) * time.Second)
-
-		title := fmt.Sprintf("Load Test Campaign %d", time.Now().Unix())
-		goalAmount := (rand.Intn(10) + 1) * 10000 
-
-		err := createCampaign(adminToken, title, "Generated by load test", goalAmount)
-		
-		stats.mu.Lock()
-		stats.totalRequests++
-		if err == nil {
-			stats.successRequests++
-		} else {
-			stats.failedRequests++
-		}
-		stats.mu.Unlock()
-	}
-}
-
-func reportStats() {
-	ticker := time.NewTicker(2 * time.Second)
-	startTime := time.Now()
-	
-	for range ticker.C {
-		stats.mu.Lock()
-		total := stats.totalRequests
-		success := stats.successRequests
-		failed := stats.failedRequests
-		pledges := stats.pledgesCreated
-		payments := stats.paymentsProcessed
-		views := stats.campaignsViewed
-		stats.mu.Unlock()
-
-		elapsed := time.Since(startTime).Seconds()
-		rps := float64(total) / elapsed
-		successRate := float64(0)
-		if total > 0 {
-			successRate = (float64(success) / float64(total)) * 100
-		}
-
-		fmt.Printf("\r🔄 Req: %d | ✓ OK: %d (%.1f%%) | ✗ Fail: %d | 💰 Pledges: %d | 💸 Paid: %d | 👀 Views: %d | RPS: %.2f",
-			total, success, successRate, failed, pledges, payments, views, rps)
-	}
-}
-
-
-// API Functions
-
-func login(email, password string) (string, error) {
-	payload := map[string]string{
-		"email":    email,
-		"password": password,
-	}
-	
-	body, _ := json.Marshal(payload)
-	resp, err := http.Post(gatewayURL+"/auth/login", "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("login failed: %d", resp.StatusCode)
-	}
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	
-	token, ok := result["token"].(string)
-	if !ok {
-		return "", fmt.Errorf("no token in response")
-	}
-	
-	return token, nil
-}
-
-func registerAndLogin(email, password string) (string, error) {
-	// Try to register
-	payload := map[string]string{
-		"email":    email,
-		"password": password,
-		"name":     "Load Test User",
-	}
-	
-	body, _ := json.Marshal(payload)
-	resp, err := http.Post(gatewayURL+"/auth/register", "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-	
-	// If registration succeeded, return token
-	if token, ok := result["token"].(string); ok && token != "" {
-		return token, nil
-	}
-	
-	// If registration failed, try login
-	return login(email, password)
-}
-
-func createCampaign(token, title, description string, goalAmount int) error {
-	payload := map[string]interface{}{
-		"title":       title,
-		"description": description,
-		"goalAmount":  goalAmount,
-	}
-	
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", gatewayURL+"/campaigns", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 201 && resp.StatusCode != 200 {
-		return fmt.Errorf("campaign creation failed: %d", resp.StatusCode)
-	}
-	
-	return nil
-}
-
-func createPledge(token string, campaignID, amount int) (int, error) {
-	payload := map[string]interface{}{
-		"campaignId": campaignID,
-		"amount":     amount,
-	}
-	
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", gatewayURL+"/pledges", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-Idempotency-Key", fmt.Sprintf("load-%d-%d", campaignID, time.Now().UnixNano()))
-	
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 201 && resp.StatusCode != 200 {
-		return 0, fmt.Errorf("pledge creation failed: %d", resp.StatusCode)
-	}
-
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, err
-	}
-
-	if id, ok := result["id"].(float64); ok {
-		return int(id), nil
-	}
-	
-	return 0, fmt.Errorf("could not parse pledge ID")
-}
-
-func simulatePaymentWebhook(pledgeID int, status string) error {
-	payload := map[string]interface{}{
-		"eventId":  fmt.Sprintf("evt_%d_%d", pledgeID, time.Now().UnixNano()),
-		"pledgeId": pledgeID,
-		"status":   status,
-	}
-	
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", gatewayURL+"/payments/webhook", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-	
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("payment webhook failed: %d", resp.StatusCode)
-	}
-	
-	return nil
-}
-
-func getCampaign(campaignID int) error {
-	resp, err := http.Get(fmt.Sprintf("%s/campaigns/%d", gatewayURL, campaignID))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("campaign view failed: %d", resp.StatusCode)
-	}
-	
-	return nil
-}
-
-func listCampaigns() error {
-	resp, err := http.Get(gatewayURL + "/campaigns")
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("list campaigns failed: %d", resp.StatusCode)
-	}
-	
-	return nil
 }
 

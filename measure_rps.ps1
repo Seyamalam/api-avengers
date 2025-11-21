@@ -23,13 +23,7 @@ try {
     go build -o loadtest.exe .
     
     Write-Host "Running load test..."
-    $process = Start-Process -FilePath ".\loadtest.exe" -NoNewWindow -PassThru
-    
-    # Wait for 60 seconds
-    Start-Sleep -Seconds 60
-    
-    # Stop the process
-    Stop-Process -Id $process.Id -Force
+    .\loadtest.exe
     
     Write-Host "`nTest completed."
     Write-Host "Please check the final RPS number in the output above."
