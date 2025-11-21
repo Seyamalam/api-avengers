@@ -9,30 +9,45 @@ import (
 	"time"
 )
 
-var targetURLs = []string{
+var allTargets = []string{
 	"http://localhost:8080/campaigns",
 	"http://localhost:8080/health",
-	"http://localhost:8080/campaigns/1", // Assuming campaign 1 exists
+	"http://localhost:8080/campaigns/1",
+}
+
+var singleTarget = []string{
+	"http://localhost:8080/campaigns",
 }
 
 const (
-	concurrency = 200 // Increased workers
-	duration    = 60 * time.Second
+	concurrency = 200
+	phaseDuration = 20 * time.Second
 )
 
 func main() {
-	fmt.Println("🚀 Starting High-Performance Load Test (Multi-Endpoint)")
-	fmt.Printf("Targets: %v\n", targetURLs)
-	fmt.Printf("Concurrency: %d workers\n", concurrency)
-	fmt.Printf("Duration: %v\n\n", duration)
+	fmt.Println("🚀 Starting Phased High-Performance Load Test")
+	
+	// Phase 1: Multi-Endpoint
+	fmt.Println("\n--- PHASE 1: Multi-Endpoint Load (20s) ---")
+	runPhase(allTargets, phaseDuration)
 
+	// Phase 2: Single-Endpoint
+	fmt.Println("\n--- PHASE 2: Single-Endpoint Load (/campaigns) (20s) ---")
+	runPhase(singleTarget, phaseDuration)
+
+	fmt.Println("\n✅ Load Test Complete")
+}
+
+func runPhase(targets []string, duration time.Duration) {
+	fmt.Printf("Targets: %v\n", targets)
+	fmt.Printf("Concurrency: %d workers\n", concurrency)
+	
 	var (
 		totalRequests uint64
 		successCount  uint64
 		failedCount   uint64
 	)
 
-	// Optimized HTTP Client
 	client := &http.Client{
 		Transport: &http.Transport{
 			MaxIdleConns:        1000,
@@ -40,13 +55,12 @@ func main() {
 			IdleConnTimeout:     90 * time.Second,
 			DisableKeepAlives:   false,
 		},
-		Timeout: 5 * time.Second, // Shorter timeout for fail-fast
+		Timeout: 5 * time.Second,
 	}
 
 	start := time.Now()
 	done := make(chan struct{})
 
-	// Timer to stop the test
 	go func() {
 		time.Sleep(duration)
 		close(done)
@@ -55,11 +69,9 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(concurrency)
 
-	// Worker Pool
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			// Local random source to avoid lock contention on global rand
 			r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(i)))
 			
 			for {
@@ -67,9 +79,7 @@ func main() {
 				case <-done:
 					return
 				default:
-					// Pick random URL
-					url := targetURLs[r.Intn(len(targetURLs))]
-					
+					url := targets[r.Intn(len(targets))]
 					resp, err := client.Get(url)
 					atomic.AddUint64(&totalRequests, 1)
 					
@@ -88,7 +98,6 @@ func main() {
 		}()
 	}
 
-	// Stats Reporter
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		for {
@@ -110,19 +119,15 @@ func main() {
 	elapsed := time.Since(start).Seconds()
 	rps := float64(totalRequests) / elapsed
 
-	fmt.Println("\n\n========================================")
-	fmt.Println("🎉 Load Test Completed")
-	fmt.Println("========================================")
+	fmt.Println("\n\n--- Phase Summary ---")
 	fmt.Printf("Total Requests: %d\n", totalRequests)
 	fmt.Printf("Success:        %d\n", successCount)
 	fmt.Printf("Failed:         %d\n", failedCount)
-	fmt.Printf("Duration:       %.2fs\n", elapsed)
 	fmt.Printf("Average RPS:    %.2f\n", rps)
-	fmt.Println("========================================")
-
+	
 	if rps >= 1000 {
-		fmt.Println("✅ SUCCESS: Target of 1000 RPS met!")
+		fmt.Println("✅ Target met (>1000 RPS)")
 	} else {
-		fmt.Println("❌ FAILURE: Target of 1000 RPS not met.")
+		fmt.Println("❌ Target NOT met (<1000 RPS)")
 	}
 }
