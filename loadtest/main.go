@@ -2,21 +2,27 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
+var targetURLs = []string{
+	"http://localhost:8080/campaigns",
+	"http://localhost:8080/health",
+	"http://localhost:8080/campaigns/1", // Assuming campaign 1 exists
+}
+
 const (
-	targetURL     = "http://localhost:8080/campaigns"
-	concurrency   = 100 // Number of concurrent workers
-	duration      = 60 * time.Second
+	concurrency = 200 // Increased workers
+	duration    = 60 * time.Second
 )
 
 func main() {
-	fmt.Println("🚀 Starting High-Performance Load Test")
-	fmt.Printf("Target: %s\n", targetURL)
+	fmt.Println("🚀 Starting High-Performance Load Test (Multi-Endpoint)")
+	fmt.Printf("Targets: %v\n", targetURLs)
 	fmt.Printf("Concurrency: %d workers\n", concurrency)
 	fmt.Printf("Duration: %v\n\n", duration)
 
@@ -34,7 +40,7 @@ func main() {
 			IdleConnTimeout:     90 * time.Second,
 			DisableKeepAlives:   false,
 		},
-		Timeout: 10 * time.Second,
+		Timeout: 5 * time.Second, // Shorter timeout for fail-fast
 	}
 
 	start := time.Now()
@@ -53,12 +59,18 @@ func main() {
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
+			// Local random source to avoid lock contention on global rand
+			r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(i)))
+			
 			for {
 				select {
 				case <-done:
 					return
 				default:
-					resp, err := client.Get(targetURL)
+					// Pick random URL
+					url := targetURLs[r.Intn(len(targetURLs))]
+					
+					resp, err := client.Get(url)
 					atomic.AddUint64(&totalRequests, 1)
 					
 					if err == nil {
@@ -114,4 +126,3 @@ func main() {
 		fmt.Println("❌ FAILURE: Target of 1000 RPS not met.")
 	}
 }
-
