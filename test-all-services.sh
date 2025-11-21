@@ -536,6 +536,21 @@ fi
 echo ""
 
 # ===========================================
+# SECTION 9: HIGH LOAD PERFORMANCE TEST
+# ===========================================
+echo -e "\n${BLUE}🚀 SECTION 9: High Load Performance Test${NC}"
+echo -e "${BLUE}========================================${NC}"
+
+if [ -f "./measure_rps.sh" ]; then
+  echo -e "${YELLOW}Running 1000 RPS Load Test...${NC}"
+  chmod +x ./measure_rps.sh
+  ./measure_rps.sh
+else
+  echo -e "${RED}✗ measure_rps.sh not found${NC}"
+fi
+echo ""
+
+# ===========================================
 # FINAL SUMMARY
 # ===========================================
 echo -e "\n${BLUE}========================================${NC}"
